@@ -3,6 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <link rel="icon" href="/favicon.ico" sizes="any" />
     <title>Atlas User Dashboard</title>
     <style>
       :root {
@@ -19,8 +20,14 @@
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
         background: radial-gradient(circle at top right, #dbeafe 0%, var(--bg) 40%);
         color: var(--ink);
+        height: 100vh;
+        overflow: hidden;
       }
-      .wrap { max-width: 1160px; margin: 0 auto; padding: 20px; }
+      .wrap {
+        width: 100vw;
+        height: 100vh;
+        padding: 12px;
+      }
       .card {
         background: var(--card);
         border: 1px solid var(--line);
@@ -54,6 +61,24 @@
         border-color: var(--line);
       }
       .hidden { display: none; }
+      #app { height: 100%; display: flex; flex-direction: column; gap: 12px; }
+      .layout {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: minmax(420px, 48%) minmax(420px, 52%);
+        gap: 12px;
+      }
+      .panel-col {
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      .scroll-card {
+        min-height: 0;
+        overflow: auto;
+      }
       .status { display: inline-block; border-radius: 999px; background: #e0e7ff; padding: 4px 9px; font-size: 0.8rem; }
       .rss-list {
         max-height: 260px;
@@ -65,9 +90,47 @@
       }
       .rss-item { display: flex; gap: 8px; align-items: flex-start; padding: 4px 2px; font-size: 0.88rem; }
       .rss-item small { color: var(--muted); display: block; }
+      .rss-actions { margin-left: auto; display: flex; gap: 6px; }
+      .mini-btn {
+        border: 1px solid var(--line);
+        background: #fff;
+        color: var(--ink);
+        border-radius: 8px;
+        padding: 3px 8px;
+        font-size: 0.78rem;
+        cursor: pointer;
+      }
       table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
       th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 10px 8px; vertical-align: top; }
       th { background: #f8fafc; }
+      .title-cell {
+        display: flex;
+        gap: 6px;
+        align-items: flex-start;
+        justify-content: space-between;
+      }
+      .title-cell a { flex: 1; min-width: 0; }
+      .browser-wrap {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
+      .browser-toolbar {
+        display: flex;
+        gap: 8px;
+        margin: 8px 0;
+      }
+      .browser-toolbar input {
+        flex: 1;
+      }
+      iframe {
+        width: 100%;
+        flex: 1;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        background: #fff;
+      }
       .error-box {
         border: 1px solid #fecaca;
         background: #fef2f2;
@@ -77,9 +140,13 @@
       }
       @media (max-width: 900px) {
         .grid.two { grid-template-columns: 1fr; }
+        .layout { grid-template-columns: 1fr; overflow: auto; }
+        body { overflow: auto; }
+        .wrap { height: auto; min-height: 100vh; }
+        #app { height: auto; }
       }
       @media (max-width: 760px) {
-        .wrap { padding: 12px; }
+        .wrap { padding: 8px; }
         th:nth-child(1), td:nth-child(1) { display: none; }
       }
     </style>
@@ -111,8 +178,9 @@
           </div>
         </div>
 
-        <div class="grid two">
-          <div class="card">
+        <div class="layout">
+          <div class="panel-col">
+            <div class="card">
             <h2>RSS Sources (User Selection)</h2>
             <div class="muted">Sources imported from old/rss-manager.jsx</div>
             <div class="toolbar">
@@ -122,25 +190,41 @@
             </div>
             <div id="rssCount" class="muted" style="margin:8px 0;"></div>
             <div id="rssList" class="rss-list"></div>
+            </div>
+
+            <div class="card">
+            <h2>Latest Items</h2>
+            <div class="scroll-card">
+            <table>
+              <thead>
+                <tr><th>Source</th><th>Title</th><th>Published</th></tr>
+              </thead>
+              <tbody id="rows">
+                <tr><td colspan="3">No data yet.</td></tr>
+              </tbody>
+            </table>
+            </div>
+            </div>
           </div>
 
-          <div class="card">
+          <div class="panel-col">
+            <div class="card">
             <h2>Run Metadata</h2>
             <div id="meta" class="muted">No run yet.</div>
             <div id="errors" class="error-box hidden" style="margin-top:10px;"></div>
-          </div>
-        </div>
+            </div>
 
-        <div class="card">
-          <h2>Latest Items</h2>
-          <table>
-            <thead>
-              <tr><th>Source</th><th>Title</th><th>Published</th></tr>
-            </thead>
-            <tbody id="rows">
-              <tr><td colspan="3">No data yet.</td></tr>
-            </tbody>
-          </table>
+            <div class="card browser-wrap">
+              <h2>Browsing Window</h2>
+              <div class="muted">Browse feed or article URLs in-app. Some websites may block iframe embedding.</div>
+              <div class="browser-toolbar">
+                <input id="browseUrl" placeholder="Paste URL to browse" />
+                <button class="secondary" id="openInFrameBtn">Open in pane</button>
+                <button class="secondary" id="openNewTabBtn">Open new tab</button>
+              </div>
+              <iframe id="browseFrame" title="Atlas browse pane" src="about:blank"></iframe>
+            </div>
+          </div>
         </div>
       </div>
     </div>
@@ -163,6 +247,10 @@
       const rowsEl = document.getElementById("rows");
       const metaEl = document.getElementById("meta");
       const errorsEl = document.getElementById("errors");
+      const browseUrlEl = document.getElementById("browseUrl");
+      const browseFrameEl = document.getElementById("browseFrame");
+      const openInFrameBtn = document.getElementById("openInFrameBtn");
+      const openNewTabBtn = document.getElementById("openNewTabBtn");
 
       const rssCountEl = document.getElementById("rssCount");
       const rssListEl = document.getElementById("rssList");
@@ -190,6 +278,13 @@
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json"
         };
+      }
+
+      function browseInPane(url) {
+        const clean = String(url || "").trim();
+        if (!clean) return;
+        browseUrlEl.value = clean;
+        browseFrameEl.src = clean;
       }
 
       async function login() {
@@ -237,8 +332,16 @@
             ? `<div class="muted" style="margin-top:8px;font-weight:700;">${escapeHtml(s.category)}</div>`
             : "";
           lastCategory = s.category;
-          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small></span></label>`;
+          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small></span><span class="rss-actions"><button class="mini-btn browse-source-btn" type="button" data-url="${escapeHtml(s.url)}">Browse</button></span></label>`;
         }).join("");
+
+        rssListEl.querySelectorAll(".browse-source-btn").forEach(btn => {
+          btn.addEventListener("click", (e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            browseInPane(btn.getAttribute("data-url") || "");
+          });
+        });
       }
 
       function getSelectedSourceIds() {
@@ -325,8 +428,12 @@
           const title = escapeHtml(it.title || "(untitled)");
           const url = escapeHtml(it.url || "#");
           const published = escapeHtml(it.published_at || "");
-          return `<tr><td>${source}</td><td><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></td><td>${published}</td></tr>`;
+          return `<tr><td>${source}</td><td><div class="title-cell"><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a><button class="mini-btn browse-item-btn" type="button" data-url="${url}">Browse</button></div></td><td>${published}</td></tr>`;
         }).join("");
+
+        rowsEl.querySelectorAll(".browse-item-btn").forEach(btn => {
+          btn.addEventListener("click", () => browseInPane(btn.getAttribute("data-url") || ""));
+        });
       }
 
       selectAllBtn.addEventListener("click", () => {
@@ -367,6 +474,13 @@
         } catch (err) {
           alert(err);
         }
+      });
+
+      openInFrameBtn.addEventListener("click", () => browseInPane(browseUrlEl.value));
+      openNewTabBtn.addEventListener("click", () => {
+        const url = (browseUrlEl.value || "").trim();
+        if (!url) return;
+        window.open(url, "_blank", "noopener,noreferrer");
       });
 
       apiBaseEl.placeholder = `${window.location.origin}/api`;

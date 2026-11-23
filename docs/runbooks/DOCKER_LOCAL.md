@@ -112,6 +112,8 @@ curl -s "http://127.0.0.1:8000/connectors" -H "Authorization: Bearer ${TOKEN}"
 Notes:
 - In `RUN_MODE=dryrun` or when `ALLOW_OUTBOUND_NETWORK=false`, connector uses fixture data.
 - In live mode with outbound network enabled, connector pulls real RSS feeds from `RSS_FEEDS`.
+- `Latest Items` is empty until you run the RSS connector for the logged-in user.
+- API service now defaults to outbound enabled via `ALLOW_OUTBOUND_NETWORK_API=true` in compose.
 - Connector runs and fetched items are persisted in PostgreSQL tables:
 	- connector_runs
 	- connector_items

@@ -36,6 +36,7 @@ services:
       - ../../.env.example
     environment:
       RUN_MODE: ${RUN_MODE:-dryrun}
+      ALLOW_OUTBOUND_NETWORK: ${ALLOW_OUTBOUND_NETWORK_API:-true}
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER:-atlas}:${POSTGRES_PASSWORD:-atlas_local_dev}@postgres:5432/${POSTGRES_DB:-atlas}
       REDIS_URL: redis://redis:6379/0
     ports:

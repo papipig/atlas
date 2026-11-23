@@ -25,13 +25,27 @@ class RSSConnector(BaseConnector):
         }
 
         safe_limit = max(limit_per_feed, 1)
+        feeds_override = kwargs.get("feed_urls")
+        feeds = [f for f in (feeds_override or self._get_feed_list()) if f]
 
-        if run_mode == "dryrun" or not allow_outbound:
+        # For dashboard user flows, prefer real RSS feeds whenever explicit feed URLs are provided.
+        # Dryrun fixtures are kept only as fallback when there is no configured feed list.
+        if not feeds:
             items = self._load_fixture_items()[: safe_limit * 50]
             return ConnectorRunResult(mode="dryrun-fixtures", items=items, errors=[])
 
-        feeds_override = kwargs.get("feed_urls")
-        feeds = [f for f in (feeds_override or self._get_feed_list()) if f]
+        if not allow_outbound:
+            return ConnectorRunResult(
+                mode="network-blocked",
+                items=[],
+                errors=[
+                    {
+                        "feed": "*",
+                        "error": "Outbound network is disabled. Enable ALLOW_OUTBOUND_NETWORK for real RSS fetches.",
+                    }
+                ],
+            )
+
         all_items: list[dict[str, str]] = []
         errors: list[dict[str, str]] = []
         timeout = int(os.getenv("INGEST_HTTP_TIMEOUT_SEC", "30"))
@@ -50,7 +64,8 @@ class RSSConnector(BaseConnector):
                 errors.append({"feed": feed_url, "error": str(exc)})
 
         all_items.sort(key=lambda x: (x.get("published_at", ""), x.get("title", "")), reverse=True)
-        return ConnectorRunResult(mode="live-rss", items=all_items, errors=errors)
+        mode = "live-rss" if run_mode != "dryrun" else "dryrun-live-rss"
+        return ConnectorRunResult(mode=mode, items=all_items, errors=errors)
 
     def _text_or_empty(self, elem: ET.Element | None) -> str:
         return (elem.text or "").strip() if elem is not None else ""
