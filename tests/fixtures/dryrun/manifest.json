@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "seed": 42,
+  "generated_at": "2026-11-22T06:00:00Z",
+  "timezone": "Europe/Paris",
+  "window": {
+    "start": "2026-11-21T06:00:00Z",
+    "end": "2026-11-22T06:00:00Z"
+  },
+  "includes": {
+    "sources": "sources.json",
+    "items_glob": "items/*.json",
+    "enrichments_glob": "enrichments/*.json",
+    "briefings_glob": "briefings/*.md"
+  },
+  "simulation": {
+    "inject_duplicates": true,
+    "inject_malformed_items": true,
+    "failure_rate": 0.03,
+    "latency_ms": {
+      "min": 20,
+      "max": 250
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "item_id": "itm_2026_11_22_0001",
+  "source_id": "src_thinktank_frs",
+  "external_id": "frs-rss-987654",
+  "url": "https://example.org/report-2026-strategy",
+  "title": "New Strategic Outlook 2026",
+  "raw_content": "<html><body>report</body></html>",
+  "cleaned_content": "A new report evaluates strategic posture in Europe and proposes capability priorities.",
+  "published_at": "2026-11-22T04:30:00Z",
+  "fetched_at": "2026-11-22T06:01:20Z",
+  "language": "en",
+  "content_hash": "sha256:2f7a0001"
+}

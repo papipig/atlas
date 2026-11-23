@@ -1,0 +1,12 @@
+{
+  "item_id": "itm_2026_11_22_0002",
+  "source_id": "src_press_guardian",
+  "external_id": "guardian-world-001",
+  "url": "https://example.org/world-policy-shift",
+  "title": "Policy Shift Announced in Regional Summit",
+  "cleaned_content": "Leaders announced a new policy mechanism with immediate implementation steps.",
+  "published_at": "2026-11-22T05:10:00Z",
+  "fetched_at": "2026-11-22T06:02:00Z",
+  "language": "en",
+  "content_hash": "sha256:2f7a0002"
+}

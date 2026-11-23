@@ -1,0 +1,375 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width,initial-scale=1" />
+    <title>Atlas User Dashboard</title>
+    <style>
+      :root {
+        --bg: #f3f5fb;
+        --card: #fff;
+        --ink: #0f172a;
+        --muted: #475569;
+        --line: #dbe1ea;
+        --brand: #1d4ed8;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+        background: radial-gradient(circle at top right, #dbeafe 0%, var(--bg) 40%);
+        color: var(--ink);
+      }
+      .wrap { max-width: 1160px; margin: 0 auto; padding: 20px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        box-shadow: 0 8px 20px rgba(15, 23, 42, 0.07);
+        padding: 16px;
+        margin-bottom: 14px;
+      }
+      h1, h2 { margin: 0 0 10px; }
+      h1 { font-size: 1.4rem; }
+      h2 { font-size: 1.05rem; }
+      .muted { color: var(--muted); font-size: 0.92rem; }
+      .grid { display: grid; gap: 12px; }
+      .grid.two { grid-template-columns: 1fr 1fr; }
+      .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+      input, select, button {
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 10px 12px;
+        font-size: 0.93rem;
+      }
+      button {
+        background: var(--brand);
+        color: #fff;
+        border-color: var(--brand);
+        cursor: pointer;
+      }
+      button.secondary {
+        background: #fff;
+        color: var(--ink);
+        border-color: var(--line);
+      }
+      .hidden { display: none; }
+      .status { display: inline-block; border-radius: 999px; background: #e0e7ff; padding: 4px 9px; font-size: 0.8rem; }
+      .rss-list {
+        max-height: 260px;
+        overflow: auto;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 8px;
+        background: #f8fafc;
+      }
+      .rss-item { display: flex; gap: 8px; align-items: flex-start; padding: 4px 2px; font-size: 0.88rem; }
+      .rss-item small { color: var(--muted); display: block; }
+      table { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+      th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 10px 8px; vertical-align: top; }
+      th { background: #f8fafc; }
+      .error-box {
+        border: 1px solid #fecaca;
+        background: #fef2f2;
+        color: #7f1d1d;
+        border-radius: 10px;
+        padding: 10px;
+      }
+      @media (max-width: 900px) {
+        .grid.two { grid-template-columns: 1fr; }
+      }
+      @media (max-width: 760px) {
+        .wrap { padding: 12px; }
+        th:nth-child(1), td:nth-child(1) { display: none; }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div class="card" id="loginCard">
+        <h1>Atlas Login</h1>
+        <div class="muted">Per-user dashboard. Default account: demo / demo</div>
+        <div class="toolbar">
+          <input id="apiBase" size="36" aria-label="API base URL" placeholder="https://localhost/api" />
+          <input id="username" value="demo" aria-label="Username" />
+          <input id="password" type="password" value="demo" aria-label="Password" />
+          <button id="loginBtn">Login</button>
+        </div>
+      </div>
+
+      <div id="app" class="hidden">
+        <div class="card">
+          <h1>Atlas RSS Dashboard</h1>
+          <div id="whoami" class="muted"></div>
+          <div class="toolbar">
+            <select id="connector">
+              <option value="rss">rss</option>
+            </select>
+            <input id="limit" type="number" min="1" max="200" value="20" />
+            <button id="runBtn">Run connector</button>
+            <button class="secondary" id="refreshBtn">Refresh latest</button>
+          </div>
+        </div>
+
+        <div class="grid two">
+          <div class="card">
+            <h2>RSS Sources (User Selection)</h2>
+            <div class="muted">Sources imported from old/rss-manager.jsx</div>
+            <div class="toolbar">
+              <button class="secondary" id="selectAllBtn">Select all</button>
+              <button class="secondary" id="selectNoneBtn">Select none</button>
+              <button id="saveSourcesBtn">Save selection</button>
+            </div>
+            <div id="rssCount" class="muted" style="margin:8px 0;"></div>
+            <div id="rssList" class="rss-list"></div>
+          </div>
+
+          <div class="card">
+            <h2>Run Metadata</h2>
+            <div id="meta" class="muted">No run yet.</div>
+            <div id="errors" class="error-box hidden" style="margin-top:10px;"></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>Latest Items</h2>
+          <table>
+            <thead>
+              <tr><th>Source</th><th>Title</th><th>Published</th></tr>
+            </thead>
+            <tbody id="rows">
+              <tr><td colspan="3">No data yet.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      let token = "";
+      let sources = [];
+
+      const apiBaseEl = document.getElementById("apiBase");
+      const usernameEl = document.getElementById("username");
+      const passwordEl = document.getElementById("password");
+      const loginBtn = document.getElementById("loginBtn");
+
+      const appEl = document.getElementById("app");
+      const whoamiEl = document.getElementById("whoami");
+      const connectorEl = document.getElementById("connector");
+      const limitEl = document.getElementById("limit");
+      const runBtn = document.getElementById("runBtn");
+      const refreshBtn = document.getElementById("refreshBtn");
+      const rowsEl = document.getElementById("rows");
+      const metaEl = document.getElementById("meta");
+      const errorsEl = document.getElementById("errors");
+
+      const rssCountEl = document.getElementById("rssCount");
+      const rssListEl = document.getElementById("rssList");
+      const saveSourcesBtn = document.getElementById("saveSourcesBtn");
+      const selectAllBtn = document.getElementById("selectAllBtn");
+      const selectNoneBtn = document.getElementById("selectNoneBtn");
+
+      function escapeHtml(s) {
+        return String(s || "")
+          .replaceAll("&", "&amp;")
+          .replaceAll("<", "&lt;")
+          .replaceAll(">", "&gt;")
+          .replaceAll('"', "&quot;")
+          .replaceAll("'", "&#039;");
+      }
+
+      function getApiBase() {
+        const typed = apiBaseEl.value.trim();
+        if (typed) return typed.replace(/\/$/, "");
+        return `${window.location.origin}/api`;
+      }
+
+      function authHeaders() {
+        return {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json"
+        };
+      }
+
+      async function login() {
+        const base = getApiBase();
+        const payload = {
+          username: usernameEl.value.trim(),
+          password: passwordEl.value
+        };
+
+        const res = await fetch(`${base}/auth/login`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload)
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`Login failed: ${txt}`);
+        }
+
+        const data = await res.json();
+        token = data.token;
+        whoamiEl.innerHTML = `Connected as <span class="status">${escapeHtml(data.user.username)}</span> role <span class="status">${escapeHtml(data.user.role)}</span>`;
+
+        document.getElementById("loginCard").classList.add("hidden");
+        appEl.classList.remove("hidden");
+
+        await loadSources();
+        await refreshLatest();
+      }
+
+      async function loadSources() {
+        const base = getApiBase();
+        const res = await fetch(`${base}/users/me/rss-sources`, { headers: authHeaders() });
+        if (!res.ok) throw new Error(`Cannot load sources: HTTP ${res.status}`);
+        const payload = await res.json();
+        sources = payload.sources || [];
+
+        const enabledCount = sources.filter(s => s.enabled).length;
+        rssCountEl.textContent = `${enabledCount} enabled / ${sources.length} total`;
+
+        let lastCategory = "";
+        rssListEl.innerHTML = sources.map(s => {
+          const catHeader = s.category !== lastCategory
+            ? `<div class="muted" style="margin-top:8px;font-weight:700;">${escapeHtml(s.category)}</div>`
+            : "";
+          lastCategory = s.category;
+          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small></span></label>`;
+        }).join("");
+      }
+
+      function getSelectedSourceIds() {
+        return [...rssListEl.querySelectorAll("input[type=checkbox][data-source-id]")]
+          .filter(x => x.checked)
+          .map(x => Number(x.getAttribute("data-source-id")));
+      }
+
+      async function saveSources() {
+        const base = getApiBase();
+        const source_ids = getSelectedSourceIds();
+        const res = await fetch(`${base}/users/me/rss-sources`, {
+          method: "PUT",
+          headers: authHeaders(),
+          body: JSON.stringify({ source_ids })
+        });
+        if (!res.ok) {
+          const txt = await res.text();
+          throw new Error(`Save failed: ${txt}`);
+        }
+        await loadSources();
+      }
+
+      async function runConnector() {
+        const base = getApiBase();
+        const connector = connectorEl.value;
+        const limit = Number(limitEl.value || 20);
+        runBtn.disabled = true;
+        runBtn.textContent = "Running...";
+        try {
+          const res = await fetch(`${base}/connectors/${connector}/run?limit_per_feed=${limit}`, {
+            method: "POST",
+            headers: authHeaders(),
+          });
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(txt);
+          }
+          await refreshLatest();
+        } finally {
+          runBtn.disabled = false;
+          runBtn.textContent = "Run connector";
+        }
+      }
+
+      async function refreshLatest() {
+        const base = getApiBase();
+        const connector = connectorEl.value;
+        const limit = Number(limitEl.value || 20);
+        const res = await fetch(`${base}/connectors/${connector}/latest?limit=${limit}`, {
+          headers: authHeaders(),
+        });
+
+        if (!res.ok) {
+          const txt = await res.text();
+          metaEl.textContent = `Load failed: ${txt}`;
+          return;
+        }
+
+        const payload = await res.json();
+        render(payload);
+      }
+
+      function render(payload) {
+        metaEl.innerHTML = `Connector <span class="status">${escapeHtml(payload.connector)}</span> | Mode <span class="status">${escapeHtml(payload.mode || "none")}</span> | Last run: ${escapeHtml(payload.run_at || "never")} | Items: ${escapeHtml(payload.count || 0)}`;
+
+        const errors = payload.errors || [];
+        if (errors.length) {
+          errorsEl.classList.remove("hidden");
+          errorsEl.innerHTML = `<strong>Feed errors</strong><ul>${errors.map(e => `<li>${escapeHtml(e.feed)}: ${escapeHtml(e.error)}</li>`).join("")}</ul>`;
+        } else {
+          errorsEl.classList.add("hidden");
+          errorsEl.innerHTML = "";
+        }
+
+        const items = payload.items || [];
+        if (!items.length) {
+          rowsEl.innerHTML = '<tr><td colspan="3">No items yet.</td></tr>';
+          return;
+        }
+
+        rowsEl.innerHTML = items.map(it => {
+          const source = escapeHtml(it.source || "n/a");
+          const title = escapeHtml(it.title || "(untitled)");
+          const url = escapeHtml(it.url || "#");
+          const published = escapeHtml(it.published_at || "");
+          return `<tr><td>${source}</td><td><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a></td><td>${published}</td></tr>`;
+        }).join("");
+      }
+
+      selectAllBtn.addEventListener("click", () => {
+        rssListEl.querySelectorAll("input[type=checkbox]").forEach(x => { x.checked = true; });
+      });
+
+      selectNoneBtn.addEventListener("click", () => {
+        rssListEl.querySelectorAll("input[type=checkbox]").forEach(x => { x.checked = false; });
+      });
+
+      saveSourcesBtn.addEventListener("click", async () => {
+        try {
+          await saveSources();
+        } catch (err) {
+          alert(err);
+        }
+      });
+
+      runBtn.addEventListener("click", async () => {
+        try {
+          await runConnector();
+        } catch (err) {
+          alert(err);
+        }
+      });
+
+      refreshBtn.addEventListener("click", async () => {
+        try {
+          await refreshLatest();
+        } catch (err) {
+          alert(err);
+        }
+      });
+
+      loginBtn.addEventListener("click", async () => {
+        try {
+          await login();
+        } catch (err) {
+          alert(err);
+        }
+      });
+
+      apiBaseEl.placeholder = `${window.location.origin}/api`;
+    </script>
+  </body>
+</html>

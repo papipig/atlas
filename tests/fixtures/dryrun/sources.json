@@ -1,0 +1,38 @@
+[
+  {
+    "source_id": "src_thinktank_frs",
+    "name": "FRS",
+    "domain_type": "think_tank",
+    "ingestion_mode": "rss",
+    "polling_cron": "0 6 * * *",
+    "default_language": "fr",
+    "active": true,
+    "recipe": {
+      "primary_connector": "rss",
+      "fallback_chain": ["scrape"],
+      "request_policy": {
+        "timeout_sec": 30,
+        "max_retries": 3,
+        "rate_limit_rpm": 30
+      }
+    }
+  },
+  {
+    "source_id": "src_press_guardian",
+    "name": "The Guardian World",
+    "domain_type": "press",
+    "ingestion_mode": "rss",
+    "polling_cron": "0 6 * * *",
+    "default_language": "en",
+    "active": true,
+    "recipe": {
+      "primary_connector": "rss",
+      "fallback_chain": [],
+      "request_policy": {
+        "timeout_sec": 30,
+        "max_retries": 2,
+        "rate_limit_rpm": 60
+      }
+    }
+  }
+]

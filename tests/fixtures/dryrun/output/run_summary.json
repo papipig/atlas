@@ -1,0 +1,19 @@
+{
+  "run_mode": "dryrun",
+  "dataset": "tests/fixtures/dryrun",
+  "seed": 42,
+  "failure_rate": 0.03,
+  "stats": {
+    "total_items": 2,
+    "valid_items": 1,
+    "malformed_items": 0,
+    "duplicates": 0,
+    "simulated_failures": 1,
+    "enriched_items": 0,
+    "sources_count": 2
+  },
+  "output": {
+    "briefing": "tests/fixtures/dryrun/output/daily_briefing.generated.md",
+    "summary": "tests/fixtures/dryrun/output/run_summary.json"
+  }
+}

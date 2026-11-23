@@ -1,0 +1,11 @@
+{
+  "item_id": "itm_2026_11_22_0001",
+  "summary": "The report introduces a revised strategic framework for European defense priorities.",
+  "tags": ["defense", "strategy", "europe"],
+  "sentiment": "neutral",
+  "actors": ["France", "European Union", "NATO"],
+  "model_provider": "dryrun",
+  "model_name": "fixture-engine",
+  "prompt_version": "v1",
+  "processed_at": "2026-11-22T06:03:10Z"
+}
