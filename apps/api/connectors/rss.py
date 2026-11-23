@@ -1,14 +1,19 @@
 from __future__ import annotations
 
+import html
 import json
 import os
+import re
+import ssl
 from datetime import timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
-from urllib.error import URLError
-from urllib.parse import urlparse
+from urllib.error import HTTPError, URLError
+from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
+
+import feedparser
 
 from .types import BaseConnector, ConnectorRunResult
 
@@ -51,21 +56,251 @@ class RSSConnector(BaseConnector):
         timeout = int(os.getenv("INGEST_HTTP_TIMEOUT_SEC", "30"))
         user_agent = os.getenv("INGEST_USER_AGENT", "atlas-rss-connector/0.1")
 
+        allow_insecure_ssl = os.getenv("ALLOW_INSECURE_SSL_FEEDS", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+        include_fallback_feed_items = os.getenv("INCLUDE_FEED_FALLBACK_ITEMS", "true").strip().lower() in {
+            "1",
+            "true",
+            "yes",
+        }
+
         for feed_url in feeds:
             parsed = urlparse(feed_url)
             source_name = parsed.netloc or "unknown-source"
-            req = Request(feed_url, headers={"User-Agent": user_agent})
-            try:
-                with urlopen(req, timeout=timeout) as resp:
-                    payload = resp.read()
-                items = self._parse_rss_or_atom(payload, source_name, feed_url, safe_limit)
-                all_items.extend(items)
-            except (URLError, TimeoutError, ET.ParseError, ValueError) as exc:
-                errors.append({"feed": feed_url, "error": str(exc)})
 
-        all_items.sort(key=lambda x: (x.get("published_at", ""), x.get("title", "")), reverse=True)
+            items, err = self._collect_feed_items(
+                feed_url=feed_url,
+                source_name=source_name,
+                user_agent=user_agent,
+                timeout=timeout,
+                safe_limit=safe_limit,
+                allow_insecure_ssl=allow_insecure_ssl,
+            )
+            if items:
+                all_items.extend(items)
+            elif err:
+                errors.append({"feed": feed_url, "error": err})
+                if include_fallback_feed_items:
+                    all_items.append(
+                        {
+                            "source": source_name,
+                            "source_url": feed_url,
+                            "title": "Feed currently unavailable - open source URL",
+                            "url": feed_url,
+                            "published_at": "",
+                        }
+                    )
+
+        # Deduplicate by URL first, then by title+source when URL is absent.
+        seen: set[str] = set()
+        unique_items: list[dict[str, str]] = []
+        for item in all_items:
+            key = item.get("url") or f"{item.get('source','')}|{item.get('title','')}"
+            if key in seen:
+                continue
+            seen.add(key)
+            unique_items.append(item)
+
+        unique_items.sort(key=lambda x: (x.get("published_at", ""), x.get("title", "")), reverse=True)
         mode = "live-rss" if run_mode != "dryrun" else "dryrun-live-rss"
-        return ConnectorRunResult(mode=mode, items=all_items, errors=errors)
+        return ConnectorRunResult(mode=mode, items=unique_items, errors=errors)
+
+    def _collect_feed_items(
+        self,
+        feed_url: str,
+        source_name: str,
+        user_agent: str,
+        timeout: int,
+        safe_limit: int,
+        allow_insecure_ssl: bool,
+    ) -> tuple[list[dict[str, str]], str | None]:
+        candidates = self._candidate_urls(feed_url)
+        attempted: list[str] = []
+        discovery_attempted = False
+
+        for candidate in candidates:
+            attempted.append(candidate)
+            payload, fetch_err = self._fetch_payload(
+                url=candidate,
+                user_agent=user_agent,
+                timeout=timeout,
+                allow_insecure_ssl=allow_insecure_ssl,
+            )
+            if fetch_err:
+                # For 404/403, try discovery from the website homepage once.
+                if ("HTTP Error 404" in fetch_err or "HTTP Error 403" in fetch_err) and not discovery_attempted:
+                    discovered = self._discover_feed_candidates(candidate, user_agent, timeout, allow_insecure_ssl)
+                    discovery_attempted = True
+                    for extra in discovered:
+                        if extra not in candidates:
+                            candidates.append(extra)
+                continue
+
+            items = self._parse_feed_with_fallback(payload, source_name, feed_url, safe_limit)
+            if items:
+                return items, None
+
+        final_err = "No readable feed found"
+        if attempted:
+            final_err = f"{final_err} after trying {len(attempted)} URL(s): {', '.join(attempted[:4])}"
+            if len(attempted) > 4:
+                final_err += ", ..."
+        return [], final_err
+
+    def _fetch_payload(
+        self,
+        url: str,
+        user_agent: str,
+        timeout: int,
+        allow_insecure_ssl: bool,
+    ) -> tuple[bytes | None, str | None]:
+        req = Request(
+            url,
+            headers={
+                "User-Agent": user_agent,
+                "Accept": "application/rss+xml, application/atom+xml, application/xml, text/xml;q=0.9, */*;q=0.8",
+            },
+        )
+        try:
+            with urlopen(req, timeout=timeout) as resp:
+                return resp.read(), None
+        except ssl.SSLCertVerificationError as exc:
+            if not allow_insecure_ssl:
+                return None, str(exc)
+            try:
+                insecure_ctx = ssl._create_unverified_context()
+                with urlopen(req, timeout=timeout, context=insecure_ctx) as resp:
+                    return resp.read(), None
+            except Exception as retry_exc:  # noqa: BLE001
+                return None, str(retry_exc)
+        except HTTPError as exc:
+            return None, f"HTTP Error {exc.code}: {exc.reason}"
+        except (URLError, TimeoutError, OSError) as exc:
+            return None, str(exc)
+
+    def _parse_feed_with_fallback(
+        self,
+        payload: bytes,
+        source_name: str,
+        source_url: str,
+        max_items: int,
+    ) -> list[dict[str, str]]:
+        # Fast path for well-formed RSS/Atom.
+        try:
+            parsed_items = self._parse_rss_or_atom(payload, source_name, source_url, max_items)
+            if parsed_items:
+                return parsed_items
+        except (ET.ParseError, ValueError):
+            pass
+
+        # Fallback for malformed XML/entities commonly found in public feeds.
+        feed = feedparser.parse(payload)
+        out: list[dict[str, str]] = []
+        for entry in feed.entries[:max_items]:
+            title = html.unescape(str(getattr(entry, "title", "") or "").strip())
+            link = str(getattr(entry, "link", "") or "").strip()
+            published_raw = str(
+                getattr(entry, "published", "")
+                or getattr(entry, "updated", "")
+                or getattr(entry, "created", "")
+                or ""
+            ).strip()
+            published = self._safe_dt(published_raw)
+            if title or link:
+                out.append(
+                    {
+                        "source": source_name,
+                        "source_url": source_url,
+                        "title": title,
+                        "url": link,
+                        "published_at": published,
+                    }
+                )
+        return out
+
+    def _candidate_urls(self, url: str) -> list[str]:
+        parsed = urlparse(url)
+        if not parsed.scheme or not parsed.netloc:
+            return [url]
+
+        candidates: list[str] = [url]
+
+        # Try trailing slash variants.
+        if parsed.path and not parsed.path.endswith("/"):
+            candidates.append(url + "/")
+        if parsed.path.endswith("/") and parsed.path != "/":
+            candidates.append(url.rstrip("/"))
+
+        # Try host variants (www/non-www).
+        host = parsed.netloc
+        if host.startswith("www."):
+            alt_host = host[4:]
+        else:
+            alt_host = f"www.{host}"
+        if alt_host and alt_host != host:
+            alt_base = f"{parsed.scheme}://{alt_host}"
+            candidates.append(alt_base + parsed.path)
+            if parsed.path == "/" or not parsed.path:
+                candidates.extend([
+                    f"{alt_base}/feed/",
+                    f"{alt_base}/rss.xml",
+                    f"{alt_base}/feed.xml",
+                ])
+
+        # For root-like URLs, try common feed endpoints.
+        if parsed.path in {"", "/"}:
+            base = f"{parsed.scheme}://{parsed.netloc}"
+            candidates.extend([
+                f"{base}/feed/",
+                f"{base}/rss",
+                f"{base}/rss.xml",
+                f"{base}/feed.xml",
+                f"{base}/atom.xml",
+            ])
+
+        deduped: list[str] = []
+        for c in candidates:
+            if c not in deduped:
+                deduped.append(c)
+        return deduped
+
+    def _discover_feed_candidates(
+        self,
+        from_url: str,
+        user_agent: str,
+        timeout: int,
+        allow_insecure_ssl: bool,
+    ) -> list[str]:
+        parsed = urlparse(from_url)
+        if not parsed.scheme or not parsed.netloc:
+            return []
+        homepage = f"{parsed.scheme}://{parsed.netloc}/"
+        payload, err = self._fetch_payload(homepage, user_agent, timeout, allow_insecure_ssl)
+        if err or not payload:
+            return []
+
+        text = payload.decode("utf-8", errors="ignore")
+        hrefs = re.findall(
+            r"<link[^>]+rel=[\"'][^\"']*alternate[^\"']*[\"'][^>]+type=[\"'](?:application/rss\+xml|application/atom\+xml|text/xml)[\"'][^>]+href=[\"']([^\"']+)[\"']",
+            text,
+            flags=re.IGNORECASE,
+        )
+        if not hrefs:
+            hrefs = re.findall(
+                r"<a[^>]+href=[\"']([^\"']*(?:rss|feed|atom)[^\"']*)[\"']",
+                text,
+                flags=re.IGNORECASE,
+            )
+
+        out: list[str] = []
+        for href in hrefs:
+            cand = urljoin(homepage, href.strip())
+            if cand and cand not in out:
+                out.append(cand)
+        return out
 
     def _text_or_empty(self, elem: ET.Element | None) -> str:
         return (elem.text or "").strip() if elem is not None else ""

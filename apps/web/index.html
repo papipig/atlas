@@ -75,13 +75,21 @@
         flex-direction: column;
         gap: 12px;
       }
+      .card.fill {
+        flex: 1;
+        min-height: 0;
+        display: flex;
+        flex-direction: column;
+      }
       .scroll-card {
         min-height: 0;
         overflow: auto;
+        flex: 1;
       }
       .status { display: inline-block; border-radius: 999px; background: #e0e7ff; padding: 4px 9px; font-size: 0.8rem; }
       .rss-list {
-        max-height: 260px;
+        min-height: 0;
+        flex: 1;
         overflow: auto;
         border: 1px solid var(--line);
         border-radius: 10px;
@@ -144,6 +152,7 @@
         body { overflow: auto; }
         .wrap { height: auto; min-height: 100vh; }
         #app { height: auto; }
+        .card.fill { min-height: 320px; }
       }
       @media (max-width: 760px) {
         .wrap { padding: 8px; }
@@ -180,7 +189,7 @@
 
         <div class="layout">
           <div class="panel-col">
-            <div class="card">
+            <div class="card fill">
             <h2>RSS Sources (User Selection)</h2>
             <div class="muted">Sources imported from old/rss-manager.jsx</div>
             <div class="toolbar">
@@ -192,7 +201,7 @@
             <div id="rssList" class="rss-list"></div>
             </div>
 
-            <div class="card">
+            <div class="card fill">
             <h2>Latest Items</h2>
             <div class="scroll-card">
             <table>
@@ -411,7 +420,10 @@
         const errors = payload.errors || [];
         if (errors.length) {
           errorsEl.classList.remove("hidden");
-          errorsEl.innerHTML = `<strong>Feed errors</strong><ul>${errors.map(e => `<li>${escapeHtml(e.feed)}: ${escapeHtml(e.error)}</li>`).join("")}</ul>`;
+          errorsEl.innerHTML = `<strong>Feed errors</strong><ul>${errors.map(e => `<li>${escapeHtml(e.feed)}: ${escapeHtml(e.error)} <button class="mini-btn browse-error-feed-btn" type="button" data-url="${escapeHtml(e.feed)}">Browse</button></li>`).join("")}</ul>`;
+          errorsEl.querySelectorAll(".browse-error-feed-btn").forEach(btn => {
+            btn.addEventListener("click", () => browseInPane(btn.getAttribute("data-url") || ""));
+          });
         } else {
           errorsEl.classList.add("hidden");
           errorsEl.innerHTML = "";
