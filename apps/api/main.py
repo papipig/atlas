@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import os
 import secrets
+import threading
+import uuid
 from datetime import datetime, timezone
 from typing import Any
 
@@ -21,19 +23,28 @@ from apps.api.db import (
     list_user_rss_sources,
     save_run,
     set_user_rss_sources,
+    persist_pipeline_items,
+    get_daily_briefing,
 )
 
 app = FastAPI(title="Atlas API", version="0.1.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=[
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "https://localhost",
+        "https://127.0.0.1",
+    ],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 SESSIONS: dict[str, dict[str, Any]] = {}
+COLLECTION_JOBS: dict[str, dict[str, Any]] = {}
+COLLECTION_LOCK = threading.Lock()
 
 
 class LoginRequest(BaseModel):
@@ -43,6 +54,11 @@ class LoginRequest(BaseModel):
 
 class RssSelectionRequest(BaseModel):
     source_ids: list[int]
+
+
+class RssTestRequest(BaseModel):
+    url: str
+    limit: int = 3
 
 
 def _require_user(authorization: str = Header(default="")) -> dict[str, Any]:
@@ -158,18 +174,46 @@ def run_connector(
         connector_kwargs["feed_urls"] = get_enabled_rss_urls(int(current_user["id"]))
 
     result = connector.run(limit_per_feed=limit_per_feed, **connector_kwargs)
-    run = save_run(
-        connector_name=name,
-        mode=result.mode,
-        items=result.items,
-        errors=result.errors,
-        user_id=int(current_user["id"]),
-    )
+    try:
+        run = save_run(
+            connector_name=name,
+            mode=result.mode,
+            items=result.items,
+            errors=result.errors,
+            user_id=int(current_user["id"]),
+        )
+    except Exception as exc:
+        run = {
+            "id": None,
+            "connector_name": name,
+            "mode": result.mode,
+            "items_count": len(result.items),
+            "errors_count": len(result.errors),
+            "storage_error": f"{type(exc).__name__}: {exc}",
+        }
+
+    pipeline_stats: dict[str, Any] = {
+        "items_fetched": len(result.items),
+        "items_new": 0,
+        "items_updated": 0,
+        "briefing_id": 0,
+    }
+    try:
+        pipeline_stats = persist_pipeline_items(
+            connector_name=name,
+            mode=result.mode,
+            items=result.items,
+            errors=result.errors,
+            user_id=int(current_user["id"]),
+        )
+    except Exception as exc:
+        pipeline_stats["pipeline_error"] = f"{type(exc).__name__}: {exc}"
 
     return {
-    "status": "ok",
+        "status": "ok",
         "connector": name,
         "run": run,
+        "pipeline": pipeline_stats,
     }
 
 
@@ -311,3 +355,136 @@ def dashboard(current_user: dict[str, Any] = Depends(_require_user)) -> str:
     </body>
 </html>
 """
+
+
+@app.get("/briefings/today")
+def briefing_today(current_user: dict[str, Any] = Depends(_require_user)) -> dict[str, Any]:
+    briefing = get_daily_briefing("fr")
+    if not briefing:
+        return {"briefing_date": None, "synthesis_markdown": "", "update_count": 0}
+    return briefing
+
+
+@app.post("/sources/test-rss")
+def test_rss_source(
+    payload: RssTestRequest,
+    current_user: dict[str, Any] = Depends(_require_user),
+) -> dict[str, Any]:
+    url = payload.url.strip()
+    if not url:
+        raise HTTPException(status_code=400, detail="URL requise")
+
+    connector = get_connector("rss")
+    result = connector.run(limit_per_feed=max(1, min(payload.limit, 10)), feed_urls=[url])
+    return {
+        "status": "ok",
+        "mode": result.mode,
+        "count": len(result.items),
+        "items": result.items[:payload.limit],
+        "errors": result.errors,
+    }
+
+
+def _set_collection_job(job_id: str, patch: dict[str, Any]) -> None:
+    with COLLECTION_LOCK:
+        COLLECTION_JOBS[job_id].update(patch)
+
+
+def _run_rss_collection_job(job_id: str, user_id: int, limit_per_feed: int) -> None:
+    feed_urls = get_enabled_rss_urls(user_id)
+    connector = get_connector("rss")
+    all_items: list[dict[str, Any]] = []
+    all_errors: list[dict[str, str]] = []
+
+    total = len(feed_urls)
+    _set_collection_job(job_id, {"total": total, "status": "running"})
+
+    for index, feed_url in enumerate(feed_urls, start=1):
+        with COLLECTION_LOCK:
+            if COLLECTION_JOBS[job_id].get("stop_requested"):
+                _set_collection_job(job_id, {"status": "stopped", "current": feed_url})
+                break
+
+        _set_collection_job(job_id, {"current": feed_url, "processed": index - 1})
+        result = connector.run(limit_per_feed=limit_per_feed, feed_urls=[feed_url])
+        all_items.extend(result.items)
+        all_errors.extend(result.errors)
+        _set_collection_job(job_id, {
+            "processed": index,
+            "items_found": len(all_items),
+            "errors_count": len(all_errors),
+            "current": feed_url,
+        })
+
+    unique: dict[str, dict[str, Any]] = {}
+    for item in all_items:
+        key = str(item.get("url") or f"{item.get('source','')}|{item.get('title','')}")
+        unique[key] = item
+
+    try:
+        run = save_run(
+            connector_name="rss",
+            mode="live-rss",
+            items=list(unique.values()),
+            errors=all_errors,
+            user_id=user_id,
+        )
+    except Exception as exc:
+        run = {"storage_error": f"{type(exc).__name__}: {exc}"}
+
+    with COLLECTION_LOCK:
+        job = COLLECTION_JOBS[job_id]
+        final_status = "stopped" if job.get("stop_requested") else "completed"
+        job.update({
+            "status": final_status,
+            "processed": job.get("processed", 0),
+            "items_found": len(unique),
+            "errors_count": len(all_errors),
+            "run": run,
+        })
+
+
+@app.post("/connectors/rss/jobs")
+def start_rss_collection_job(
+    limit_per_feed: int = 20,
+    current_user: dict[str, Any] = Depends(_require_user),
+) -> dict[str, Any]:
+    job_id = uuid.uuid4().hex
+    with COLLECTION_LOCK:
+        COLLECTION_JOBS[job_id] = {
+            "status": "starting",
+            "processed": 0,
+            "total": 0,
+            "items_found": 0,
+            "errors_count": 0,
+            "current": None,
+            "stop_requested": False,
+        }
+    thread = threading.Thread(
+        target=_run_rss_collection_job,
+        args=(job_id, int(current_user["id"]), max(1, limit_per_feed)),
+        daemon=True,
+    )
+    thread.start()
+    return {"job_id": job_id, "status": "starting"}
+
+
+@app.get("/connectors/rss/jobs/{job_id}")
+def get_rss_collection_job(job_id: str, current_user: dict[str, Any] = Depends(_require_user)) -> dict[str, Any]:
+    with COLLECTION_LOCK:
+        job = dict(COLLECTION_JOBS.get(job_id, {}))
+    if not job:
+        raise HTTPException(status_code=404, detail="Collection job not found")
+    processed = int(job.get("processed", 0))
+    total = int(job.get("total", 0))
+    job["progress"] = round((processed / total * 100) if total else 0, 1)
+    return job
+
+
+@app.post("/connectors/rss/jobs/{job_id}/stop")
+def stop_rss_collection_job(job_id: str, current_user: dict[str, Any] = Depends(_require_user)) -> dict[str, Any]:
+    with COLLECTION_LOCK:
+        if job_id not in COLLECTION_JOBS:
+            raise HTTPException(status_code=404, detail="Collection job not found")
+        COLLECTION_JOBS[job_id]["stop_requested"] = True
+    return {"job_id": job_id, "status": "stop_requested"}

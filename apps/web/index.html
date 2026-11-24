@@ -60,6 +60,9 @@
         color: var(--ink);
         border-color: var(--line);
       }
+      button:hover { filter: brightness(0.96); }
+      button:active { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(15,23,42,.14); }
+      button:disabled { cursor: wait; opacity: .72; transform: none; }
       .hidden { display: none; }
       #app { height: 100%; display: flex; flex-direction: column; gap: 12px; }
       .layout {
@@ -146,6 +149,80 @@
         border-radius: 10px;
         padding: 10px;
       }
+      .briefing {
+        white-space: pre-wrap;
+        line-height: 1.55;
+        overflow: auto;
+        max-height: 260px;
+        background: #f8fafc;
+        border: 1px solid var(--line);
+        border-radius: 10px;
+        padding: 12px;
+      }
+      .topbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+      .nav-tabs { display: flex; gap: 6px; }
+      .nav-tab { border: 1px solid transparent; background: transparent; color: var(--muted); }
+      .nav-tab.active { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
+      .view { display: none; }
+      .view.active { display: block; }
+      .dashboard-view.active { display: flex; flex-direction: column; height: 100%; }
+      .source-row { cursor: pointer; }
+      .source-row:hover td { background: #f8fafc; }
+      .tag { display: inline-block; margin: 3px 4px 3px 0; padding: 3px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.75rem; }
+      .article-detail {
+        flex: 1;
+        width: 100%;
+        min-width: 0;
+        max-width: none;
+        padding-top: 14px;
+        text-align: left;
+        line-height: 1.55;
+      }
+      .config-layout { display: grid; grid-template-columns: 280px minmax(320px, 1fr); gap: 12px; height: calc(100vh - 150px); }
+      .config-sources, .config-editor { min-height: 0; overflow: auto; }
+      .config-source { width: 100%; display: flex; justify-content: space-between; align-items: center; margin-bottom: 7px; background: #fff; color: var(--ink); border: 1px solid var(--line); text-align: left; }
+      .config-source.active { border-color: #93c5fd; background: #eff6ff; }
+      .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+      .form-grid label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 0.85rem; }
+      .form-grid input, .form-grid select, .form-grid textarea { width: 100%; }
+      .form-grid textarea { min-height: 72px; resize: vertical; }
+      .span-2 { grid-column: 1 / -1; }
+      .dashboard-shell {
+        flex: 1;
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 230px var(--feed-width, 420px) 12px minmax(380px, 1fr);
+        grid-template-areas: "sources feed resizer detail";
+        gap: 10px;
+      }
+      .dashboard-shell > .dashboard-panel { grid-area: sources; }
+      .dashboard-shell > .feed-panel { grid-area: feed; }
+      .dashboard-shell > .detail-resizer { grid-area: resizer; }
+      .dashboard-shell > .detail-panel { grid-area: detail; }
+      .dashboard-panel { min-height: 0; overflow: hidden; }
+      .feed-panel, .detail-panel { min-height: 0; display: flex; flex-direction: column; }
+      .feed-list, .article-detail { min-height: 0; overflow: auto; }
+      .feed-card { width: 100%; display: block; text-align: left; margin-bottom: 8px; padding: 11px; color: var(--ink); background: #fff; border: 1px solid var(--line); }
+      .feed-card.active { border-color: #93c5fd; background: #eff6ff; }
+      .feed-card-title { display: block; font-weight: 750; line-height: 1.35; }
+      .feed-card-meta { display: block; margin-top: 5px; color: var(--muted); font-size: 0.78rem; }
+      .detail-toolbar {
+        flex: 0 0 auto;
+        min-height: 52px;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        gap: 12px;
+        padding-bottom: 10px;
+        border-bottom: 1px solid var(--line);
+      }
+      .detail-toolbar h2 { white-space: nowrap; }
+      .detail-toolbar .toolbar { margin: 0; flex-wrap: nowrap; }
+      .detail-toolbar select, .detail-toolbar button { height: 38px; padding: 8px 10px; white-space: nowrap; }
+      .detail-resizer { width: 12px; cursor: col-resize; border-radius: 999px; background: linear-gradient(90deg, transparent 3px, #cbd5e1 3px, #cbd5e1 9px, transparent 9px); }
+      .detail-resizer:hover, .detail-resizer.dragging { background: #93c5fd; }
+      .article-detail.small { font-size: 0.88rem; }
+      .detail-empty { color: var(--muted); padding: 24px 8px; }
       @media (max-width: 900px) {
         .grid.two { grid-template-columns: 1fr; }
         .layout { grid-template-columns: 1fr; overflow: auto; }
@@ -158,81 +235,194 @@
         .wrap { padding: 8px; }
         th:nth-child(1), td:nth-child(1) { display: none; }
       }
+      @media (max-width: 1100px) {
+        .dashboard-shell {
+          grid-template-columns: 210px minmax(250px, 360px) 12px minmax(320px, 1fr);
+        }
+      }
+      .login-screen {
+        position: fixed;
+        inset: 0;
+        z-index: 100;
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background:
+          radial-gradient(circle at 15% 15%, rgba(147, 197, 253, 0.55), transparent 34%),
+          radial-gradient(circle at 85% 80%, rgba(199, 210, 254, 0.55), transparent 32%),
+          #f8fafc;
+      }
+      .login-screen.hidden { display: none; }
+      .login-card {
+        width: min(420px, calc(100vw - 32px));
+        padding: 34px;
+        border: 1px solid rgba(219, 225, 234, 0.95);
+        border-radius: 18px;
+        background: rgba(255, 255, 255, 0.96);
+        box-shadow: 0 24px 60px rgba(15, 23, 42, 0.16);
+      }
+      .login-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 24px; }
+      .login-mark {
+        width: 44px;
+        height: 44px;
+        display: grid;
+        place-items: center;
+        border-radius: 12px;
+        background: var(--brand);
+        color: #fff;
+        font-size: 1.25rem;
+        font-weight: 800;
+      }
+      .login-card h1 { margin: 0; }
+      .login-form { display: grid; gap: 12px; margin-top: 18px; }
+      .login-form label { display: grid; gap: 7px; color: var(--muted); font-size: 0.86rem; font-weight: 650; }
+      .login-form input { width: 100%; height: 46px; background: #fff; }
+      .login-form button { width: 100%; height: 46px; margin-top: 4px; }
+      .login-form button:disabled { cursor: wait; opacity: 0.72; }
+      .login-error { min-height: 20px; color: #b91c1c; font-size: 0.86rem; }
     </style>
   </head>
   <body>
     <div class="wrap">
-      <div class="card" id="loginCard">
-        <h1>Atlas Login</h1>
-        <div class="muted">Per-user dashboard. Default account: demo / demo</div>
-        <div class="toolbar">
-          <input id="apiBase" size="36" aria-label="API base URL" placeholder="https://localhost/api" />
-          <input id="username" value="demo" aria-label="Username" />
-          <input id="password" type="password" value="demo" aria-label="Password" />
-          <button id="loginBtn">Login</button>
+      <section class="login-screen" id="loginCard" aria-label="Atlas login">
+        <div class="login-card">
+          <div class="login-brand">
+            <div class="login-mark">A</div>
+            <div>
+              <h1>Atlas</h1>
+              <div class="muted">Intelligence dashboard</div>
+            </div>
+          </div>
+          <div class="muted">Sign in to access your sources and daily briefings.</div>
+          <form class="login-form" id="loginForm">
+            <label>API base URL
+              <input id="apiBase" aria-label="API base URL" placeholder="https://localhost/api" />
+            </label>
+            <label>Username
+              <input id="username" value="demo" autocomplete="username" aria-label="Username" />
+            </label>
+            <label>Password
+              <input id="password" type="password" value="demo" autocomplete="current-password" aria-label="Password" />
+            </label>
+            <div id="loginError" class="login-error" role="alert"></div>
+            <button id="loginBtn" type="submit">Sign in</button>
+          </form>
+        </div>
+      </section>
+
+      <div id="app" class="hidden">
+        <div class="card topbar">
+          <div>
+            <h1>Atlas</h1>
+            <div id="whoami" class="muted"></div>
+          </div>
+          <div class="nav-tabs">
+            <button class="nav-tab active" type="button" data-view="dashboardView">Dashboard</button>
+            <button class="nav-tab" type="button" data-view="configView">Configuration</button>
+          </div>
+        </div>
+
+        <div id="dashboardView" class="view dashboard-view active">
+          <div class="card" style="margin-bottom:10px;">
+            <div class="toolbar">
+              <select id="connector" aria-label="Connector"><option value="rss">RSS</option></select>
+              <input id="limit" type="number" min="1" max="200" value="20" aria-label="Limit" />
+              <button id="runBtn" title="Interroger les sources RSS maintenant">Actualiser les sources</button>
+              <button class="secondary" id="refreshBtn" title="Afficher les items déjà enregistrés">Recharger le dernier run</button>
+            </div>
+            <div id="meta" class="muted" style="margin-top:8px;">Aucun run pour le moment.</div>
+            <div id="briefingMeta" class="muted" style="margin-top:8px;">Aucun briefing pour aujourd'hui.</div>
+            <div id="briefing" class="briefing hidden" style="margin-top:8px;"></div>
+            <div id="errors" class="error-box hidden" style="margin-top:8px;"></div>
+          </div>
+
+          <div class="dashboard-shell">
+            <div class="card dashboard-panel">
+              <h2>Sources</h2>
+              <div class="toolbar">
+                <button class="secondary mini-btn" id="selectAllBtn">Tout</button>
+                <button class="secondary mini-btn" id="selectNoneBtn">Aucun</button>
+                <button class="mini-btn" id="saveSourcesBtn">Enregistrer</button>
+              </div>
+              <div id="rssCount" class="muted" style="margin:8px 0;"></div>
+              <div id="rssList" class="rss-list"></div>
+            </div>
+
+            <div class="card feed-panel">
+              <h2>Flux d’information</h2>
+              <div id="feedList" class="feed-list"></div>
+            </div>
+
+            <div class="card detail-panel">
+              <div class="detail-toolbar">
+                <h2 style="margin:0;">Lecture</h2>
+                <div class="toolbar">
+                  <select id="textSize" aria-label="Taille du texte">
+                    <option value="small">Petit</option>
+                    <option value="normal" selected>Standard</option>
+                    <option value="large">Grand</option>
+                  </select>
+                  <button class="secondary" id="openArticleBtn" type="button">Ouvrir sur le site</button>
+                </div>
+              </div>
+              <div id="articleDetail" class="article-detail"><div class="detail-empty">Sélectionnez un article pour lire son texte et ses éléments enrichis.</div></div>
+            </div>
+
+            <div id="detailResizer" class="detail-resizer" title="Redimensionner le panneau"></div>
+          </div>
+        </div>
+
+        <div id="configView" class="view">
+          <div class="config-layout">
+            <div class="card config-sources">
+              <h2>Sources</h2>
+              <div id="configSourceList"></div>
+              <button id="addSourceBtn" type="button" style="width:100%;margin-top:8px;">+ Ajouter une source</button>
+            </div>
+
+            <div class="card config-editor">
+              <h2>Paramètres de la source</h2>
+              <div class="form-grid">
+                <label>Nom<input id="sourceName" value="Nouvelle source" /></label>
+                <label>Catégorie<select id="sourceCategory"><option>Presse</option><option>Think tank</option><option>Institution</option><option>Blog</option><option>X</option></select></label>
+                <label class="span-2">URL du flux<input id="sourceUrl" placeholder="https://.../rss.xml" /></label>
+                <label>Dernier fetch<input id="sourceLastFetch" value="Jamais testé" readonly /></label>
+                <label>Résultat du test<input id="sourceTestResult" value="—" readonly /></label>
+                <label>Fréquence<select id="sourceFrequency"><option value="60">Toutes les heures</option><option value="360">Toutes les 6 heures</option><option value="1440" selected>Une fois par jour</option></select></label>
+                <label>Traitement<select id="sourceProcessing"><option>Résumé + tags</option><option>Résumé uniquement</option><option>Aucun traitement</option></select></label>
+                <label class="span-2">Sujets à retenir<textarea id="sourceInclude" placeholder="géopolitique, OTAN, défense européenne"></textarea></label>
+                <label class="span-2">Sujets à exclure<textarea id="sourceExclude" placeholder="sport, culture, faits divers"></textarea></label>
+                <label>Prompt personnalisé<textarea id="sourcePrompt" placeholder="Consignes spécifiques à cette source..."></textarea></label>
+                <label>Langue<select id="sourceLanguage"><option value="fr">Français</option><option value="en">Anglais</option><option value="auto">Détection automatique</option></select></label>
+              </div>
+              <div class="toolbar" style="justify-content:flex-end;margin-top:14px;">
+                <button class="secondary" id="testSourceBtn" type="button">Tester la source</button>
+                <button id="saveSourceBtn" type="button">Enregistrer</button>
+              </div>
+            </div>
+          </div>
         </div>
       </div>
 
-      <div id="app" class="hidden">
-        <div class="card">
-          <h1>Atlas RSS Dashboard</h1>
-          <div id="whoami" class="muted"></div>
-          <div class="toolbar">
-            <select id="connector">
-              <option value="rss">rss</option>
-            </select>
-            <input id="limit" type="number" min="1" max="200" value="20" />
-            <button id="runBtn">Run connector</button>
-            <button class="secondary" id="refreshBtn">Refresh latest</button>
+      <div class="login-screen hidden" id="loginScreen">
+        <div class="login-card">
+          <div class="login-brand">
+            <div class="login-mark">A</div>
+            <h1>Atlas</h1>
           </div>
-        </div>
-
-        <div class="layout">
-          <div class="panel-col">
-            <div class="card fill">
-            <h2>RSS Sources (User Selection)</h2>
-            <div class="muted">Sources imported from old/rss-manager.jsx</div>
-            <div class="toolbar">
-              <button class="secondary" id="selectAllBtn">Select all</button>
-              <button class="secondary" id="selectNoneBtn">Select none</button>
-              <button id="saveSourcesBtn">Save selection</button>
-            </div>
-            <div id="rssCount" class="muted" style="margin:8px 0;"></div>
-            <div id="rssList" class="rss-list"></div>
-            </div>
-
-            <div class="card fill">
-            <h2>Latest Items</h2>
-            <div class="scroll-card">
-            <table>
-              <thead>
-                <tr><th>Source</th><th>Title</th><th>Published</th></tr>
-              </thead>
-              <tbody id="rows">
-                <tr><td colspan="3">No data yet.</td></tr>
-              </tbody>
-            </table>
-            </div>
-            </div>
-          </div>
-
-          <div class="panel-col">
-            <div class="card">
-            <h2>Run Metadata</h2>
-            <div id="meta" class="muted">No run yet.</div>
-            <div id="errors" class="error-box hidden" style="margin-top:10px;"></div>
-            </div>
-
-            <div class="card browser-wrap">
-              <h2>Browsing Window</h2>
-              <div class="muted">Browse feed or article URLs in-app. Some websites may block iframe embedding.</div>
-              <div class="browser-toolbar">
-                <input id="browseUrl" placeholder="Paste URL to browse" />
-                <button class="secondary" id="openInFrameBtn">Open in pane</button>
-                <button class="secondary" id="openNewTabBtn">Open new tab</button>
-              </div>
-              <iframe id="browseFrame" title="Atlas browse pane" src="about:blank"></iframe>
-            </div>
+          <div class="muted" style="margin-bottom:24px;">Per-user dashboard. Default account: demo / demo</div>
+          <div class="login-form">
+            <label>API base URL
+              <input id="apiBaseLogin" size="36" aria-label="API base URL" placeholder="https://localhost/api" />
+            </label>
+            <label>Username
+              <input id="usernameLogin" value="demo" aria-label="Username" />
+            </label>
+            <label>Password
+              <input id="passwordLogin" type="password" value="demo" aria-label="Password" />
+            </label>
+            <div class="login-error" id="loginError"></div>
+            <button id="loginBtnFull">Login</button>
           </div>
         </div>
       </div>
@@ -253,19 +443,23 @@
       const limitEl = document.getElementById("limit");
       const runBtn = document.getElementById("runBtn");
       const refreshBtn = document.getElementById("refreshBtn");
-      const rowsEl = document.getElementById("rows");
       const metaEl = document.getElementById("meta");
       const errorsEl = document.getElementById("errors");
-      const browseUrlEl = document.getElementById("browseUrl");
-      const browseFrameEl = document.getElementById("browseFrame");
-      const openInFrameBtn = document.getElementById("openInFrameBtn");
-      const openNewTabBtn = document.getElementById("openNewTabBtn");
 
       const rssCountEl = document.getElementById("rssCount");
       const rssListEl = document.getElementById("rssList");
       const saveSourcesBtn = document.getElementById("saveSourcesBtn");
       const selectAllBtn = document.getElementById("selectAllBtn");
       const selectNoneBtn = document.getElementById("selectNoneBtn");
+      const briefingEl = document.getElementById("briefing");
+
+      const feedListEl = document.getElementById("feedList");
+      const articleDetailEl = document.getElementById("articleDetail");
+      const openArticleBtn = document.getElementById("openArticleBtn");
+      const textSizeEl = document.getElementById("textSize");
+      const detailResizerEl = document.getElementById("detailResizer");
+      let selectedArticleUrl = "";
+      let currentItems = [];
 
       function escapeHtml(s) {
         return String(s || "")
@@ -277,7 +471,7 @@
       }
 
       function getApiBase() {
-        const typed = apiBaseEl.value.trim();
+        const typed = localStorage.getItem("atlas-api-base") || "";
         if (typed) return typed.replace(/\/$/, "");
         return `${window.location.origin}/api`;
       }
@@ -289,11 +483,25 @@
         };
       }
 
-      function browseInPane(url) {
-        const clean = String(url || "").trim();
-        if (!clean) return;
-        browseUrlEl.value = clean;
-        browseFrameEl.src = clean;
+      function openArticle(url) {
+        let finalUrl = String(url || "").trim();
+        if (!finalUrl || finalUrl === "#") return;
+
+        if (isFeedUrl(finalUrl)) {
+          try {
+            finalUrl = new URL(finalUrl, window.location.origin).origin;
+          } catch {
+            return;
+          }
+        }
+
+        const anchor = document.createElement("a");
+        anchor.href = finalUrl;
+        anchor.target = "_blank";
+        anchor.rel = "noopener noreferrer";
+        document.body.appendChild(anchor);
+        anchor.click();
+        anchor.remove();
       }
 
       async function login() {
@@ -322,7 +530,9 @@
         appEl.classList.remove("hidden");
 
         await loadSources();
+        renderConfigSources();
         await refreshLatest();
+        await refreshBriefing();
       }
 
       async function loadSources() {
@@ -341,14 +551,15 @@
             ? `<div class="muted" style="margin-top:8px;font-weight:700;">${escapeHtml(s.category)}</div>`
             : "";
           lastCategory = s.category;
-          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small></span><span class="rss-actions"><button class="mini-btn browse-source-btn" type="button" data-url="${escapeHtml(s.url)}">Browse</button></span></label>`;
+          const lastFetch = escapeHtml(s.last_fetch_at || "Jamais fetché");
+          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small><small>Dernier fetch : ${lastFetch}</small></span><span class="rss-actions"><button class="mini-btn browse-source-btn" type="button" data-url="${escapeHtml(s.url)}">Ouvrir</button></span></label>`;
         }).join("");
 
         rssListEl.querySelectorAll(".browse-source-btn").forEach(btn => {
           btn.addEventListener("click", (e) => {
             e.preventDefault();
             e.stopPropagation();
-            browseInPane(btn.getAttribute("data-url") || "");
+            openArticle(btn.getAttribute("data-url") || "");
           });
         });
       }
@@ -390,6 +601,7 @@
             throw new Error(txt);
           }
           await refreshLatest();
+          await refreshBriefing();
         } finally {
           runBtn.disabled = false;
           runBtn.textContent = "Run connector";
@@ -414,88 +626,399 @@
         render(payload);
       }
 
+      async function refreshBriefing() {
+        const base = getApiBase();
+        const res = await fetch(`${base}/briefings/today`, { headers: authHeaders() });
+        if (!res.ok) return;
+
+        const payload = await res.json();
+        briefingEl.textContent = payload.synthesis_markdown || "Aucun briefing disponible.";
+        const existingMeta = document.getElementById("briefingMeta");
+        if (existingMeta) {
+          existingMeta.textContent = payload.updated_at
+            ? `Mise à jour ${payload.updated_at} — ${payload.update_count || 1} génération(s) aujourd'hui`
+            : "Aucun briefing pour aujourd'hui";
+        }
+      }
+
+      function showArticle(item) {
+        selectedArticleUrl = getExternalArticleUrl(item);
+        const text = htmlToReadableText(item.content || item.description || item.cleaned_content || "");
+        const summary = item.summary || "";
+        const tags = Array.isArray(item.tags) ? item.tags : [];
+        const actors = Array.isArray(item.actors) ? item.actors : [];
+
+        articleDetailEl.innerHTML = `
+          <h2>${escapeHtml(item.title || "Sans titre")}</h2>
+          <div class="source-meta">${escapeHtml(item.source || "Source inconnue")} · ${escapeHtml(item.published_at || "Date inconnue")}</div>
+          ${summary ? `<h3>Résumé</h3><p>${escapeHtml(summary)}</p>` : ""}
+          ${tags.length ? `<div><strong>Tags</strong><br>${tags.map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join("")}</div>` : ""}
+          ${actors.length ? `<div style="margin-top:8px;"><strong>Acteurs</strong><br>${actors.map(actor => `<span class="tag">${escapeHtml(actor)}</span>`).join("")}</div>` : ""}
+          <h3>Contenu</h3>
+          <div>${escapeHtml(text || "Le flux ne fournit pas de texte plus complet. Ouvrez la source originale pour lire l’article.")}</div>
+          <div class="toolbar"><button class="mini-btn" type="button" id="detailOpenArticle">Ouvrir sur le site</button></div>
+        `;
+        document.getElementById("detailOpenArticle")?.addEventListener("click", () => openArticle(selectedArticleUrl));
+
+        [...feedListEl.querySelectorAll(".feed-card")].forEach((card, index) => {
+          card.classList.toggle("active", currentItems[index]?.url === selectedArticleUrl);
+        });
+      }
+
       function render(payload) {
-        metaEl.innerHTML = `Connector <span class="status">${escapeHtml(payload.connector)}</span> | Mode <span class="status">${escapeHtml(payload.mode || "none")}</span> | Last run: ${escapeHtml(payload.run_at || "never")} | Items: ${escapeHtml(payload.count || 0)}`;
+        metaEl.innerHTML = `Connector <span class="status">${escapeHtml(payload.connector)}</span> | Mode <span class="status">${escapeHtml(payload.mode || "none")}</span> | Dernière exécution : ${escapeHtml(payload.run_at || "jamais")} | Items : ${escapeHtml(payload.count || 0)}`;
 
         const errors = payload.errors || [];
         if (errors.length) {
           errorsEl.classList.remove("hidden");
-          errorsEl.innerHTML = `<strong>Feed errors</strong><ul>${errors.map(e => `<li>${escapeHtml(e.feed)}: ${escapeHtml(e.error)} <button class="mini-btn browse-error-feed-btn" type="button" data-url="${escapeHtml(e.feed)}">Browse</button></li>`).join("")}</ul>`;
-          errorsEl.querySelectorAll(".browse-error-feed-btn").forEach(btn => {
-            btn.addEventListener("click", () => browseInPane(btn.getAttribute("data-url") || ""));
+          errorsEl.innerHTML = `<strong>Erreurs des feeds</strong><ul>${errors.map(error => `<li>${escapeHtml(error.feed)} : ${escapeHtml(error.error)} <button class="mini-btn error-open-btn" type="button" data-url="${escapeHtml(error.feed)}">Ouvrir</button></li>`).join("")}</ul>`;
+          errorsEl.querySelectorAll(".error-open-btn").forEach(button => {
+            button.addEventListener("click", () => openArticle(button.dataset.url));
           });
         } else {
           errorsEl.classList.add("hidden");
           errorsEl.innerHTML = "";
         }
 
-        const items = payload.items || [];
-        if (!items.length) {
-          rowsEl.innerHTML = '<tr><td colspan="3">No items yet.</td></tr>';
+        currentItems = payload.items || [];
+        if (!currentItems.length) {
+          feedListEl.innerHTML = '<div class="detail-empty"><strong>Aucun article disponible.</strong><br><br>Cliquez sur « Actualiser les sources » pour lancer une collecte, ou vérifiez les erreurs des feeds ci-dessus.</div>';
+          articleDetailEl.innerHTML = '<div class="detail-empty">Sélectionnez un article pour lire son contenu.</div>';
           return;
         }
 
-        rowsEl.innerHTML = items.map(it => {
-          const source = escapeHtml(it.source || "n/a");
-          const title = escapeHtml(it.title || "(untitled)");
-          const url = escapeHtml(it.url || "#");
-          const published = escapeHtml(it.published_at || "");
-          return `<tr><td>${source}</td><td><div class="title-cell"><a href="${url}" target="_blank" rel="noopener noreferrer">${title}</a><button class="mini-btn browse-item-btn" type="button" data-url="${url}">Browse</button></div></td><td>${published}</td></tr>`;
-        }).join("");
+        feedListEl.innerHTML = currentItems.map((item, index) => `
+          <button class="feed-card" type="button" data-index="${index}">
+            <span class="feed-card-title">${escapeHtml(item.title || "Sans titre")}</span>
+            <span class="feed-card-meta">${escapeHtml(item.source || "Source inconnue")} · ${escapeHtml(item.published_at || "Date inconnue")}</span>
+          </button>
+        `).join("");
 
-        rowsEl.querySelectorAll(".browse-item-btn").forEach(btn => {
-          btn.addEventListener("click", () => browseInPane(btn.getAttribute("data-url") || ""));
+        feedListEl.querySelectorAll(".feed-card").forEach(card => {
+          card.addEventListener("click", () => showArticle(currentItems[Number(card.dataset.index)]));
         });
+
+        showArticle(currentItems[0]);
       }
 
-      selectAllBtn.addEventListener("click", () => {
-        rssListEl.querySelectorAll("input[type=checkbox]").forEach(x => { x.checked = true; });
+      function renderConfigSources() {
+        const list = document.getElementById("configSourceList");
+        if (!list) return;
+        list.innerHTML = sources.map((source, index) => `
+          <button class="config-source ${index === 0 ? "active" : ""}" type="button" data-source-id="${source.id}">
+            <span><strong>${escapeHtml(source.name)}</strong><small class="muted">${escapeHtml(source.category)}</small></span>
+            <span class="status">${source.enabled ? "Actif" : "Inactif"}</span>
+          </button>
+        `).join("");
+
+        list.querySelectorAll(".config-source").forEach(button => {
+          button.addEventListener("click", () => {
+            list.querySelectorAll(".config-source").forEach(item => item.classList.remove("active"));
+            button.classList.add("active");
+            const source = sources.find(item => String(item.id) === button.dataset.sourceId);
+            if (!source) return;
+            document.getElementById("sourceName").value = source.name || "";
+            document.getElementById("sourceUrl").value = source.url || "";
+            document.getElementById("sourceCategory").value = source.category || "Presse";
+          });
+        });
+
+        if (sources[0]) {
+          document.getElementById("sourceName").value = sources[0].name || "";
+          document.getElementById("sourceUrl").value = sources[0].url || "";
+        }
+      }
+
+      document.querySelectorAll(".nav-tab").forEach(tab => {
+        tab.addEventListener("click", () => {
+          document.querySelectorAll(".nav-tab").forEach(item => item.classList.remove("active"));
+          document.querySelectorAll(".view").forEach(view => view.classList.remove("active"));
+          tab.classList.add("active");
+          document.getElementById(tab.dataset.view)?.classList.add("active");
+        });
       });
 
-      selectNoneBtn.addEventListener("click", () => {
-        rssListEl.querySelectorAll("input[type=checkbox]").forEach(x => { x.checked = false; });
+      openArticleBtn?.addEventListener("click", () => openArticle(selectedArticleUrl));
+
+      textSizeEl?.addEventListener("change", () => {
+        articleDetailEl.classList.remove("small", "large");
+        if (textSizeEl.value !== "normal") articleDetailEl.classList.add(textSizeEl.value);
+        localStorage.setItem("atlas-text-size", textSizeEl.value);
       });
 
-      saveSourcesBtn.addEventListener("click", async () => {
+      const savedTextSize = localStorage.getItem("atlas-text-size");
+      if (savedTextSize) {
+        textSizeEl.value = savedTextSize;
+        articleDetailEl.classList.toggle("small", savedTextSize === "small");
+        articleDetailEl.classList.toggle("large", savedTextSize === "large");
+      }
+
+      detailResizerEl?.addEventListener("pointerdown", event => {
+        event.preventDefault();
+        detailResizerEl.classList.add("dragging");
+        const shell = detailResizerEl.closest(".dashboard-shell");
+        const startX = event.clientX;
+        const startWidth = shell.querySelector(".feed-panel").getBoundingClientRect().width;
+
+        const move = moveEvent => {
+          const width = Math.max(280, Math.min(520, startWidth + (moveEvent.clientX - startX)));
+          document.documentElement.style.setProperty("--feed-width", `${width}px`);
+        };
+        const stop = () => {
+          detailResizerEl.classList.remove("dragging");
+          document.removeEventListener("pointermove", move);
+          document.removeEventListener("pointerup", stop);
+          localStorage.setItem("atlas-feed-width", getComputedStyle(document.documentElement).getPropertyValue("--feed-width").trim());
+        };
+        document.addEventListener("pointermove", move);
+        document.addEventListener("pointerup", stop);
+      });
+
+      const savedFeedWidth = localStorage.getItem("atlas-feed-width");
+      if (savedFeedWidth) document.documentElement.style.setProperty("--feed-width", savedFeedWidth);
+
+      // Login screen handling
+      const loginScreenEl = document.getElementById("loginScreen");
+      const apiBaseLoginEl = document.getElementById("apiBaseLogin");
+      const usernameLoginEl = document.getElementById("usernameLogin");
+      const passwordLoginEl = document.getElementById("passwordLogin");
+      const loginBtnFull = document.getElementById("loginBtnFull");
+      const loginErrorEl = document.getElementById("loginError");
+
+      function showLoginScreen() {
+        loginScreenEl.classList.remove("hidden");
+        apiBaseLoginEl.value = getApiBase();
+        usernameLoginEl.value = localStorage.getItem("atlas-username") || "demo";
+        passwordLoginEl.value = "demo";
+        setTimeout(() => {
+          apiBaseLoginEl.focus();
+        }, 100);
+      }
+
+      async function loginFull() {
+        const base = (apiBaseLoginEl.value.trim() || getApiBase()).replace(/\/$/, "");
+        const payload = {
+          username: usernameLoginEl.value.trim(),
+          password: passwordLoginEl.value
+        };
+
+        loginBtnFull.disabled = true;
+        loginBtnFull.textContent = "Connexion...";
+        loginErrorEl.textContent = "";
+
+        try {
+          const res = await fetch(`${base}/auth/login`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+
+          if (!res.ok) {
+            const txt = await res.text();
+            throw new Error(`Login failed: ${txt}`);
+          }
+
+          const data = await res.json();
+          token = data.token;
+          localStorage.setItem("atlas-token", token);
+          localStorage.setItem("atlas-api-base", base);
+          localStorage.setItem("atlas-username", payload.username);
+
+          window.location.reload();
+        } catch (error) {
+          loginErrorEl.textContent = error.message;
+        } finally {
+          loginBtnFull.disabled = false;
+          loginBtnFull.textContent = "Login";
+        }
+      }
+
+      document.getElementById("loginCard")?.addEventListener("click", () => {
+        document.getElementById("loginCard").classList.add("hidden");
+        showLoginScreen();
+      });
+
+      loginBtnFull.addEventListener("click", loginFull);
+
+      // Auto-login if token is available
+      (async () => {
+        token = localStorage.getItem("atlas-token");
+        if (token) {
+          try {
+            const base = getApiBase();
+            const res = await fetch(`${base}/auth/me`, { headers: authHeaders() });
+            if (res.ok) {
+              const data = await res.json();
+              whoamiEl.innerHTML = `Connected as <span class="status">${escapeHtml(data.username)}</span> role <span class="status">${escapeHtml(data.role)}</span>`;
+              document.getElementById("loginCard").classList.add("hidden");
+              appEl.classList.remove("hidden");
+              await loadSources();
+              renderConfigSources();
+              await refreshLatest();
+              await refreshBriefing();
+            } else {
+              showLoginScreen();
+            }
+          } catch {
+            showLoginScreen();
+          }
+        } else {
+          showLoginScreen();
+        }
+      })();
+
+      selectAllBtn?.addEventListener("click", () => {
+        rssListEl.querySelectorAll("input[type=checkbox]").forEach(input => { input.checked = true; });
+      });
+
+      selectNoneBtn?.addEventListener("click", () => {
+        rssListEl.querySelectorAll("input[type=checkbox]").forEach(input => { input.checked = false; });
+      });
+
+      saveSourcesBtn?.addEventListener("click", async () => {
+        saveSourcesBtn.disabled = true;
+        const previousText = saveSourcesBtn.textContent;
+        saveSourcesBtn.textContent = "Enregistrement...";
         try {
           await saveSources();
-        } catch (err) {
-          alert(err);
+          saveSourcesBtn.textContent = "Enregistré";
+        } catch (error) {
+          saveSourcesBtn.textContent = "Erreur";
+          metaEl.textContent = error instanceof Error ? error.message : "Erreur d’enregistrement";
+        } finally {
+          setTimeout(() => {
+            saveSourcesBtn.disabled = false;
+            saveSourcesBtn.textContent = previousText;
+          }, 900);
         }
       });
 
-      runBtn.addEventListener("click", async () => {
+      runBtn?.addEventListener("click", async () => {
+        runBtn.disabled = true;
+        runBtn.textContent = "Collecte en cours...";
         try {
           await runConnector();
-        } catch (err) {
-          alert(err);
+          runBtn.textContent = "Actualisation terminée";
+        } catch (error) {
+          runBtn.textContent = "Échec de la collecte";
+          metaEl.textContent = error instanceof Error ? error.message : "Erreur de collecte";
+        } finally {
+          setTimeout(() => {
+            runBtn.disabled = false;
+            runBtn.textContent = "Actualiser les feeds";
+          }, 900);
         }
       });
 
-      refreshBtn.addEventListener("click", async () => {
+      refreshBtn?.addEventListener("click", async () => {
+        refreshBtn.disabled = true;
+        refreshBtn.textContent = "Lecture du dernier run...";
         try {
           await refreshLatest();
-        } catch (err) {
-          alert(err);
+          refreshBtn.textContent = "Dernier run affiché";
+        } catch (error) {
+          refreshBtn.textContent = "Erreur";
+          metaEl.textContent = error instanceof Error ? error.message : "Impossible de relire le dernier run";
+        } finally {
+          setTimeout(() => {
+            refreshBtn.disabled = false;
+            refreshBtn.textContent = "Recharger le dernier run";
+          }, 900);
         }
       });
 
-      loginBtn.addEventListener("click", async () => {
+      document.getElementById("testSourceBtn")?.addEventListener("click", async () => {
+        const button = document.getElementById("testSourceBtn");
+        const urlInput = document.getElementById("sourceUrl");
+        const lastFetch = document.getElementById("sourceLastFetch");
+        const testResult = document.getElementById("sourceTestResult");
+        const url = urlInput.value.trim();
+
+        if (!url) {
+          testResult.value = "URL requise";
+          urlInput.focus();
+          return;
+        }
+
+        button.disabled = true;
+        button.textContent = "Test en cours...";
+        testResult.value = "Connexion...";
+
         try {
-          await login();
-        } catch (err) {
-          alert(err);
+          const base = getApiBase();
+          const res = await fetch(`${base}/sources/test-rss`, {
+            method: "POST",
+            headers: authHeaders(),
+            body: JSON.stringify({ url, limit: 3 }),
+          });
+          const payload = await res.json();
+          if (!res.ok) throw new Error(payload.detail || "Test impossible");
+
+          testResult.value = payload.count ? `${payload.count} article(s) trouvé(s)` : "Aucun article trouvé";
+          lastFetch.value = new Date().toLocaleString("fr-FR");
+        } catch (error) {
+          testResult.value = error instanceof Error ? error.message : "Échec du test";
+          lastFetch.value = new Date().toLocaleString("fr-FR");
+        } finally {
+          button.disabled = false;
+          button.textContent = "Tester la source";
         }
       });
 
-      openInFrameBtn.addEventListener("click", () => browseInPane(browseUrlEl.value));
-      openNewTabBtn.addEventListener("click", () => {
-        const url = (browseUrlEl.value || "").trim();
-        if (!url) return;
-        window.open(url, "_blank", "noopener,noreferrer");
-      });
+      function htmlToReadableText(value) {
+        const raw = String(value || "").trim();
+        if (!raw) return "";
 
-      apiBaseEl.placeholder = `${window.location.origin}/api`;
+        const template = document.createElement("template");
+        template.innerHTML = raw;
+        template.content.querySelectorAll("script,style,svg,noscript").forEach(node => node.remove());
+
+        template.content.querySelectorAll("br").forEach(node => node.replaceWith("\n"));
+        template.content.querySelectorAll("p,div,li,h1,h2,h3,h4,blockquote").forEach(node => {
+          node.append("\n");
+        });
+
+        const text = template.content.textContent || "";
+        return text
+          .replace(/\r/g, "")
+          .replace(/[ \t]+\n/g, "\n")
+          .replace(/\n{3,}/g, "\n\n")
+          .replace(/[ \t]{2,}/g, " ")
+          .trim();
+      }
+
+      function getExternalArticleUrl(item) {
+        const articleUrl = String(item?.url || "").trim();
+        const sourceUrl = String(item?.source_url || "").trim();
+
+        if (articleUrl && articleUrl !== "#" && !isFeedUrl(articleUrl)) {
+          return articleUrl;
+        }
+
+        if (sourceUrl && sourceUrl !== "#" && !isFeedUrl(sourceUrl)) {
+          return sourceUrl;
+        }
+
+        try {
+          const base = articleUrl || sourceUrl;
+          return base ? new URL(base, window.location.origin).origin : "";
+        } catch {
+          return "";
+        }
+      }
+
+      function isFeedUrl(url) {
+        try {
+          const parsed = new URL(String(url || ""), window.location.origin);
+          const path = parsed.pathname.toLowerCase();
+          const query = parsed.search.toLowerCase();
+          return path.endsWith(".atom") || path.endsWith(".rss") || path.endsWith(".xml") ||
+            /\/feed\/?$/.test(path) || /\/rss\/?$/.test(path) || /\/atom\/?$/.test(path) ||
+            /(?:^|&)(format|feed)=?(atom|rss|xml)/.test(query);
+        } catch {
+          return false;
+        }
+      }
     </script>
   </body>
 </html>

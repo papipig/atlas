@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 import re
 from contextlib import contextmanager
@@ -220,7 +221,8 @@ def list_user_rss_sources(user_id: int) -> list[dict[str, Any]]:
                   s.url,
                   s.status,
                   s.active,
-                  COALESCE(p.enabled, TRUE) AS enabled
+                  COALESCE(p.enabled, TRUE) AS enabled,
+                  NULL::TEXT AS last_fetch_at
                 FROM rss_sources s
                 LEFT JOIN user_rss_source_prefs p
                   ON p.source_id = s.id AND p.user_id = %s
@@ -396,3 +398,213 @@ def get_items_for_run(run_id: int, limit: int = 50) -> list[dict[str, object]]:
             )
             rows = cur.fetchall()
     return [r["payload_json"] for r in rows]
+
+
+def persist_pipeline_items(
+    connector_name: str,
+    mode: str,
+    items: list[dict[str, Any]],
+    errors: list[dict[str, Any]],
+    user_id: int | None,
+) -> dict[str, int]:
+    """Persist connector results as canonical items and local enrichments."""
+    stats = {"items_fetched": len(items), "items_new": 0, "items_updated": 0}
+
+    # Import lazily to keep the data layer independent of provider configuration.
+    from apps.api.llm import get_llm_provider
+
+    provider = get_llm_provider()
+    now = datetime.now(timezone.utc)
+
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            briefing_id: int | None = None
+
+            cur.execute(
+                "SELECT id FROM briefings WHERE briefing_date = %s AND language = %s",
+                (now.date(), "fr"),
+            )
+            existing_briefing = cur.fetchone()
+
+            for item in items:
+                url = str(item.get("url") or "").strip()
+                title = str(item.get("title") or "Sans titre")
+                if not url:
+                    continue
+
+                item_key = hashlib.sha256(url.lower().encode("utf-8")).hexdigest()
+                raw_payload = json.dumps(item, ensure_ascii=False, default=str)
+                content_hash = hashlib.sha256(
+                    f"{title}\n{item.get('cleaned_content') or item.get('summary') or ''}".encode("utf-8")
+                ).hexdigest()
+
+                cur.execute(
+                    "SELECT id FROM items WHERE item_key = %s OR url = %s",
+                    (item_key, url),
+                )
+                existing = cur.fetchone()
+
+                if existing:
+                    cur.execute(
+                        """
+                        UPDATE items SET title = %s, raw_content = %s, content_hash = %s,
+                          fetched_at = %s, metadata = %s, item_key = %s
+                        WHERE id = %s
+                        """,
+                        (
+                            title,
+                            item.get("cleaned_content") or raw_payload,
+                            content_hash,
+                            now,
+                            Jsonb(item),
+                            item_key,
+                            existing["id"],
+                        ),
+                    )
+                    item_id = existing["id"]
+                    stats["items_updated"] += 1
+                else:
+                    cur.execute(
+                        """
+                        INSERT INTO items (
+                          external_id, url, title, raw_content, fetched_at,
+                          language, content_hash, metadata, item_key
+                        ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                        RETURNING id
+                        """,
+                        (
+                            f"{connector_name}:{item_key[:16]}",
+                            url,
+                            title,
+                            item.get("cleaned_content") or "",
+                            now,
+                            "fr",
+                            content_hash,
+                            Jsonb(item),
+                            item_key,
+                        ),
+                    )
+                    item_id = cur.fetchone()["id"]
+                    stats["items_new"] += 1
+
+                enriched = provider.enrich({**item, "cleaned_content": item.get("cleaned_content") or title})
+                cur.execute(
+                    """
+                    INSERT INTO enrichments (
+                      item_id, summary, tags, actors, model_provider,
+                      model_name, prompt_version, processed_at
+                    ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s)
+                    ON CONFLICT (item_id) DO UPDATE SET
+                      summary = EXCLUDED.summary,
+                      tags = EXCLUDED.tags,
+                      actors = EXCLUDED.actors,
+                      model_provider = EXCLUDED.model_provider,
+                      model_name = EXCLUDED.model_name,
+                      prompt_version = EXCLUDED.prompt_version,
+                      processed_at = EXCLUDED.processed_at
+                    """,
+                    (
+                        item_id,
+                        enriched["summary"],
+                        Jsonb(enriched["tags"]),
+                        Jsonb(enriched["actors"]),
+                        enriched["model_provider"],
+                        enriched["model_name"],
+                        enriched["prompt_version"],
+                        now,
+                    ),
+                )
+
+            cur.execute(
+                """
+                SELECT i.id, i.title, i.url, i.metadata, e.summary, e.tags, e.actors
+                FROM items i
+                LEFT JOIN enrichments e ON e.item_id = i.id
+                WHERE i.fetched_at >= %s
+                ORDER BY i.fetched_at DESC
+                LIMIT 100
+                """,
+                (datetime(now.year, now.month, now.day, tzinfo=timezone.utc),),
+            )
+            latest = cur.fetchall()
+
+            lines = ["# Ce qui est nouveau aujourd'hui", "", "## Nouveaux signaux"]
+            for record in latest:
+                summary = record.get("summary") or "Résumé indisponible"
+                title = record.get("title") or "Sans titre"
+                url = record.get("url") or "#"
+                lines.append(f"- [{title}]({url}) — {summary}")
+            if len(lines) == 3:
+                lines.append("- Aucun nouveau signal validé pour le moment.")
+
+            lines.extend([
+                "",
+                "## Mise à jour",
+                f"- Généré le {now.isoformat()}.",
+                "- Résumés et tags produits par le moteur local Atlas.",
+            ])
+            synthesis = "\n".join(lines) + "\n"
+
+            if existing_briefing:
+                cur.execute(
+                    """
+                    UPDATE briefings SET synthesis_markdown = %s,
+                      scope_config = %s, updated_at = %s,
+                      update_count = update_count + 1,
+                      generated_at = %s
+                    WHERE id = %s
+                    RETURNING id
+                    """,
+                    (synthesis, Jsonb({"connector": connector_name, "mode": mode}), now, now, existing_briefing["id"]),
+                )
+                briefing_id = cur.fetchone()["id"]
+            else:
+                cur.execute(
+                    """
+                    INSERT INTO briefings (
+                      briefing_date, language, scope_config,
+                      synthesis_markdown, generated_at, update_count, updated_at
+                    ) VALUES (%s, %s, %s, %s, %s, 1, %s)
+                    RETURNING id
+                    """,
+                    (now.date(), "fr", Jsonb({"connector": connector_name, "mode": mode}), synthesis, now, now),
+                )
+                briefing_id = cur.fetchone()["id"]
+
+            cur.execute(
+                """
+                INSERT INTO pipeline_runs (
+                  run_at, run_mode, connector_name, user_id,
+                  items_fetched, items_new, items_updated, errors_json, briefing_id
+                ) VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
+                """,
+                (now, mode, connector_name, user_id, len(items), stats["items_new"], stats["items_updated"], Jsonb(errors), briefing_id),
+            )
+
+        conn.commit()
+
+    stats["briefing_id"] = briefing_id or 0
+    return stats
+
+
+def get_daily_briefing(language: str = "fr") -> dict[str, Any] | None:
+    now = datetime.now(timezone.utc)
+    with get_conn() as conn:
+        with conn.cursor() as cur:
+            cur.execute(
+                """
+                SELECT id, briefing_date, language, scope_config,
+                       synthesis_markdown, generated_at, updated_at, update_count
+                FROM briefings
+                WHERE briefing_date = %s AND language = %s
+                """,
+                (now.date(), language),
+            )
+            row = cur.fetchone()
+    if not row:
+        return None
+    return {
+        **dict(row),
+        "generated_at": row["generated_at"].isoformat(),
+        "updated_at": row["updated_at"].isoformat(),
+    }

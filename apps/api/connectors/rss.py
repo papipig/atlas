@@ -12,6 +12,7 @@ from urllib.error import HTTPError, URLError
 from urllib.parse import urljoin, urlparse
 from urllib.request import Request, urlopen
 import xml.etree.ElementTree as ET
+from typing import Any
 
 import feedparser
 
@@ -210,6 +211,13 @@ class RSSConnector(BaseConnector):
             ).strip()
             published = self._safe_dt(published_raw)
             if title or link:
+                description = self._text_or_empty(entry.get("description"))
+                content_elem = entry.get("content")
+                content = self._text_or_empty(content_elem)
+                if not content:
+                    content_elem = entry.get("encoded")
+                    content = self._text_or_empty(content_elem)
+                text = html.unescape(content or description).strip()
                 out.append(
                     {
                         "source": source_name,
@@ -217,6 +225,8 @@ class RSSConnector(BaseConnector):
                         "title": title,
                         "url": link,
                         "published_at": published,
+                        "description": description,
+                        "content": text,
                     }
                 )
         return out
@@ -302,8 +312,21 @@ class RSSConnector(BaseConnector):
                 out.append(cand)
         return out
 
-    def _text_or_empty(self, elem: ET.Element | None) -> str:
-        return (elem.text or "").strip() if elem is not None else ""
+    def _text_or_empty(self, elem: Any) -> str:
+        if elem is None:
+            return ""
+        if isinstance(elem, str):
+            return html.unescape(elem).strip()
+        if isinstance(elem, dict):
+            return self._text_or_empty(elem.get("value") or elem.get("text") or elem.get("content"))
+        if isinstance(elem, (list, tuple)):
+            for item in elem:
+                text = self._text_or_empty(item)
+                if text:
+                    return text
+            return ""
+        text = getattr(elem, "text", None)
+        return html.unescape(str(text or "")).strip()
 
     def _find_first(self, elem: ET.Element, candidates: list[str]) -> ET.Element | None:
         for c in candidates:
@@ -338,6 +361,13 @@ class RSSConnector(BaseConnector):
                 link = self._text_or_empty(item.find("link"))
                 pub = self._safe_dt(self._text_or_empty(item.find("pubDate")))
                 if title or link:
+                    description = self._text_or_empty(item.find("description"))
+                    content_elem = item.find("{http://purl.org/rss/1.0/modules/content/}encoded")
+                    content = self._text_or_empty(content_elem)
+                    if not content:
+                        content_elem = item.find("content")
+                        content = self._text_or_empty(content_elem)
+                    text = html.unescape(content or description).strip()
                     out.append(
                         {
                             "source": source_name,
@@ -345,6 +375,8 @@ class RSSConnector(BaseConnector):
                             "title": title,
                             "url": link,
                             "published_at": pub,
+                            "description": description,
+                            "content": text,
                         }
                     )
             return out
@@ -362,6 +394,11 @@ class RSSConnector(BaseConnector):
             updated = self._text_or_empty(entry.find("atom:updated", ns))
             pub = self._safe_dt(published or updated)
             if title or link:
+                summary_elem = entry.find("atom:summary", ns)
+                content_elem = entry.find("atom:content", ns)
+                description = self._text_or_empty(summary_elem)
+                content = self._text_or_empty(content_elem)
+                text = html.unescape(content or description).strip()
                 out.append(
                     {
                         "source": source_name,
@@ -369,6 +406,8 @@ class RSSConnector(BaseConnector):
                         "title": title,
                         "url": link,
                         "published_at": pub,
+                        "description": description,
+                        "content": text,
                     }
                 )
         return out
