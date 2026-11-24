@@ -243,6 +243,23 @@ def latest_connector_run(
             "items": [],
         }
     items = get_items_for_run(run_id=int(run["id"]), limit=limit)
+    items = [
+        item for item in items
+        if str(item.get("title") or "").strip().lower() != "feed currently unavailable - open source url"
+    ]
+    def _published_sort_key(item: dict[str, Any]) -> tuple[int, datetime]:
+        raw = str(item.get("published_at") or "").strip()
+        if not raw:
+            return (0, datetime.min.replace(tzinfo=timezone.utc))
+        try:
+            parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+            if parsed.tzinfo is None:
+                parsed = parsed.replace(tzinfo=timezone.utc)
+            return (1, parsed.astimezone(timezone.utc))
+        except (TypeError, ValueError):
+            return (0, datetime.min.replace(tzinfo=timezone.utc))
+
+    items = sorted(items, key=_published_sort_key, reverse=True)
     return {
         "connector": name,
         "run_id": run["id"],

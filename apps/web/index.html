@@ -20,12 +20,13 @@
         font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
         background: radial-gradient(circle at top right, #dbeafe 0%, var(--bg) 40%);
         color: var(--ink);
-        height: 100vh;
-        overflow: hidden;
+        min-height: 100vh;
+        overflow-y: auto;
+        overflow-x: hidden;
       }
       .wrap {
         width: 100vw;
-        height: 100vh;
+        min-height: 100vh;
         padding: 12px;
       }
       .card {
@@ -43,11 +44,23 @@
       .grid { display: grid; gap: 12px; }
       .grid.two { grid-template-columns: 1fr 1fr; }
       .toolbar { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
-      input, select, button {
-        border: 1px solid var(--line);
+      input, select, textarea, button {
+        border: 1px solid #94a3b8;
         border-radius: 10px;
         padding: 10px 12px;
         font-size: 0.93rem;
+        background: #fff;
+        color: var(--ink);
+      }
+      input:focus, select:focus, textarea:focus {
+        outline: 3px solid rgba(37, 99, 235, 0.18);
+        outline-offset: 1px;
+        border-color: #2563eb;
+      }
+      input:disabled, select:disabled, textarea:disabled {
+        background: #e2e8f0;
+        color: #64748b;
+        cursor: not-allowed;
       }
       button {
         background: var(--brand);
@@ -63,8 +76,8 @@
       button:hover { filter: brightness(0.96); }
       button:active { transform: translateY(1px); box-shadow: inset 0 2px 5px rgba(15,23,42,.14); }
       button:disabled { cursor: wait; opacity: .72; transform: none; }
-      .hidden { display: none; }
-      #app { height: 100%; display: flex; flex-direction: column; gap: 12px; }
+      .hidden { display: none !important; }
+      #app { min-height: calc(100vh - 24px); display: flex; flex-direction: column; gap: 12px; }
       .layout {
         flex: 1;
         min-height: 0;
@@ -147,7 +160,26 @@
         background: #fef2f2;
         color: #7f1d1d;
         border-radius: 10px;
-        padding: 10px;
+        padding: 8px 10px;
+        max-height: 180px;
+        overflow: auto;
+      }
+      .error-box-header {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 10px;
+        margin-bottom: 4px;
+      }
+      .error-box-close {
+        width: 30px;
+        height: 30px;
+        min-width: 30px;
+        padding: 0;
+        border-radius: 8px;
+        background: #fff;
+        color: #7f1d1d;
+        border-color: #fecaca;
       }
       .briefing {
         white-space: pre-wrap;
@@ -165,7 +197,13 @@
       .nav-tab.active { background: #eff6ff; color: #1d4ed8; border-color: #bfdbfe; }
       .view { display: none; }
       .view.active { display: block; }
-      .dashboard-view.active { display: flex; flex-direction: column; height: 100%; }
+      .dashboard-view.active {
+        display: flex;
+        flex-direction: column;
+        height: calc(100vh - 150px);
+        min-height: 480px;
+        overflow: hidden;
+      }
       .source-row { cursor: pointer; }
       .source-row:hover td { background: #f8fafc; }
       .tag { display: inline-block; margin: 3px 4px 3px 0; padding: 3px 8px; border-radius: 999px; background: #eef2ff; color: #3730a3; font-size: 0.75rem; }
@@ -184,24 +222,39 @@
       .config-source.active { border-color: #93c5fd; background: #eff6ff; }
       .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
       .form-grid label { display: flex; flex-direction: column; gap: 6px; color: var(--muted); font-size: 0.85rem; }
-      .form-grid input, .form-grid select, .form-grid textarea { width: 100%; }
+      .form-grid input, .form-grid select, .form-grid textarea {
+        width: 100%;
+        border: 1px solid #94a3b8;
+        background: #fff;
+      }
       .form-grid textarea { min-height: 72px; resize: vertical; }
       .span-2 { grid-column: 1 / -1; }
       .dashboard-shell {
         flex: 1;
         min-height: 0;
         display: grid;
-        grid-template-columns: 230px var(--feed-width, 420px) 12px minmax(380px, 1fr);
-        grid-template-areas: "sources feed resizer detail";
+        grid-template-columns: var(--feed-width, 420px) 12px minmax(380px, 1fr);
+        grid-template-areas: "feed resizer detail";
         gap: 10px;
       }
-      .dashboard-shell > .dashboard-panel { grid-area: sources; }
       .dashboard-shell > .feed-panel { grid-area: feed; }
       .dashboard-shell > .detail-resizer { grid-area: resizer; }
       .dashboard-shell > .detail-panel { grid-area: detail; }
-      .dashboard-panel { min-height: 0; overflow: hidden; }
-      .feed-panel, .detail-panel { min-height: 0; display: flex; flex-direction: column; }
-      .feed-list, .article-detail { min-height: 0; overflow: auto; }
+      .feed-panel, .detail-panel {
+        min-height: 0;
+        height: 100%;
+        display: flex;
+        flex-direction: column;
+        overflow: hidden;
+      }
+      .feed-list, .article-detail {
+        flex: 1;
+        min-height: 0;
+        overflow-y: auto;
+        overflow-x: hidden;
+        overscroll-behavior: contain;
+        scrollbar-gutter: stable;
+      }
       .feed-card { width: 100%; display: block; text-align: left; margin-bottom: 8px; padding: 11px; color: var(--ink); background: #fff; border: 1px solid var(--line); }
       .feed-card.active { border-color: #93c5fd; background: #eff6ff; }
       .feed-card-title { display: block; font-weight: 750; line-height: 1.35; }
@@ -225,10 +278,18 @@
       .detail-empty { color: var(--muted); padding: 24px 8px; }
       @media (max-width: 900px) {
         .grid.two { grid-template-columns: 1fr; }
-        .layout { grid-template-columns: 1fr; overflow: auto; }
-        body { overflow: auto; }
+        .layout { grid-template-columns: 1fr; overflow: visible; }
+        body { overflow-y: auto; overflow-x: hidden; }
         .wrap { height: auto; min-height: 100vh; }
-        #app { height: auto; }
+        #app { min-height: calc(100vh - 24px); height: auto; }
+        .dashboard-view.active { height: auto; min-height: 0; overflow: visible; }
+        .dashboard-shell { min-height: 480px; }
+        .dashboard-shell {
+          grid-template-columns: 1fr;
+          grid-template-areas: "sources" "feed" "resizer" "detail";
+          min-height: 0;
+        }
+        .detail-resizer { width: 100%; height: 12px; cursor: row-resize; }
         .card.fill { min-height: 320px; }
       }
       @media (max-width: 760px) {
@@ -276,8 +337,25 @@
       .login-card h1 { margin: 0; }
       .login-form { display: grid; gap: 12px; margin-top: 18px; }
       .login-form label { display: grid; gap: 7px; color: var(--muted); font-size: 0.86rem; font-weight: 650; }
-      .login-form input { width: 100%; height: 46px; background: #fff; }
-      .login-form button { width: 100%; height: 46px; margin-top: 4px; }
+      .login-form input {
+        width: 100%;
+        height: 46px;
+        background: #fff;
+        border: 1px solid #94a3b8;
+        box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.04);
+      }
+      .login-form button {
+        position: relative;
+        z-index: 2;
+        width: 100%;
+        height: 46px;
+        margin-top: 4px;
+        background: #1d4ed8;
+        color: #fff;
+        border: 1px solid #1d4ed8;
+        border-radius: 10px;
+        font-weight: 700;
+      }
       .login-form button:disabled { cursor: wait; opacity: 0.72; }
       .login-error { min-height: 20px; color: #b91c1c; font-size: 0.86rem; }
     </style>
@@ -337,17 +415,6 @@
           </div>
 
           <div class="dashboard-shell">
-            <div class="card dashboard-panel">
-              <h2>Sources</h2>
-              <div class="toolbar">
-                <button class="secondary mini-btn" id="selectAllBtn">Tout</button>
-                <button class="secondary mini-btn" id="selectNoneBtn">Aucun</button>
-                <button class="mini-btn" id="saveSourcesBtn">Enregistrer</button>
-              </div>
-              <div id="rssCount" class="muted" style="margin:8px 0;"></div>
-              <div id="rssList" class="rss-list"></div>
-            </div>
-
             <div class="card feed-panel">
               <h2>Flux d’information</h2>
               <div id="feedList" class="feed-list"></div>
@@ -376,6 +443,11 @@
           <div class="config-layout">
             <div class="card config-sources">
               <h2>Sources</h2>
+              <div class="toolbar" style="margin-top:0;margin-bottom:10px;">
+                <button class="secondary mini-btn" id="selectAllSourcesBtn" type="button">Tous</button>
+                <button class="secondary mini-btn" id="selectNoneSourcesBtn" type="button">Aucun</button>
+                <button class="secondary mini-btn" id="invertSourcesBtn" type="button">Inverse</button>
+              </div>
               <div id="configSourceList"></div>
               <button id="addSourceBtn" type="button" style="width:100%;margin-top:8px;">+ Ajouter une source</button>
             </div>
@@ -403,29 +475,6 @@
           </div>
         </div>
       </div>
-
-      <div class="login-screen hidden" id="loginScreen">
-        <div class="login-card">
-          <div class="login-brand">
-            <div class="login-mark">A</div>
-            <h1>Atlas</h1>
-          </div>
-          <div class="muted" style="margin-bottom:24px;">Per-user dashboard. Default account: demo / demo</div>
-          <div class="login-form">
-            <label>API base URL
-              <input id="apiBaseLogin" size="36" aria-label="API base URL" placeholder="https://localhost/api" />
-            </label>
-            <label>Username
-              <input id="usernameLogin" value="demo" aria-label="Username" />
-            </label>
-            <label>Password
-              <input id="passwordLogin" type="password" value="demo" aria-label="Password" />
-            </label>
-            <div class="login-error" id="loginError"></div>
-            <button id="loginBtnFull">Login</button>
-          </div>
-        </div>
-      </div>
     </div>
 
     <script>
@@ -446,11 +495,6 @@
       const metaEl = document.getElementById("meta");
       const errorsEl = document.getElementById("errors");
 
-      const rssCountEl = document.getElementById("rssCount");
-      const rssListEl = document.getElementById("rssList");
-      const saveSourcesBtn = document.getElementById("saveSourcesBtn");
-      const selectAllBtn = document.getElementById("selectAllBtn");
-      const selectNoneBtn = document.getElementById("selectNoneBtn");
       const briefingEl = document.getElementById("briefing");
 
       const feedListEl = document.getElementById("feedList");
@@ -541,33 +585,7 @@
         if (!res.ok) throw new Error(`Cannot load sources: HTTP ${res.status}`);
         const payload = await res.json();
         sources = payload.sources || [];
-
-        const enabledCount = sources.filter(s => s.enabled).length;
-        rssCountEl.textContent = `${enabledCount} enabled / ${sources.length} total`;
-
-        let lastCategory = "";
-        rssListEl.innerHTML = sources.map(s => {
-          const catHeader = s.category !== lastCategory
-            ? `<div class="muted" style="margin-top:8px;font-weight:700;">${escapeHtml(s.category)}</div>`
-            : "";
-          lastCategory = s.category;
-          const lastFetch = escapeHtml(s.last_fetch_at || "Jamais fetché");
-          return `${catHeader}<label class="rss-item"><input type="checkbox" data-source-id="${s.id}" ${s.enabled ? "checked" : ""} /><span><strong>${escapeHtml(s.name)}</strong><small>${escapeHtml(s.url)}</small><small>Dernier fetch : ${lastFetch}</small></span><span class="rss-actions"><button class="mini-btn browse-source-btn" type="button" data-url="${escapeHtml(s.url)}">Ouvrir</button></span></label>`;
-        }).join("");
-
-        rssListEl.querySelectorAll(".browse-source-btn").forEach(btn => {
-          btn.addEventListener("click", (e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            openArticle(btn.getAttribute("data-url") || "");
-          });
-        });
-      }
-
-      function getSelectedSourceIds() {
-        return [...rssListEl.querySelectorAll("input[type=checkbox][data-source-id]")]
-          .filter(x => x.checked)
-          .map(x => Number(x.getAttribute("data-source-id")));
+        renderConfigSources();
       }
 
       async function saveSources() {
@@ -671,7 +689,10 @@
         const errors = payload.errors || [];
         if (errors.length) {
           errorsEl.classList.remove("hidden");
-          errorsEl.innerHTML = `<strong>Erreurs des feeds</strong><ul>${errors.map(error => `<li>${escapeHtml(error.feed)} : ${escapeHtml(error.error)} <button class="mini-btn error-open-btn" type="button" data-url="${escapeHtml(error.feed)}">Ouvrir</button></li>`).join("")}</ul>`;
+          errorsEl.innerHTML = `<div class="error-box-header"><strong>Erreurs des feeds (${errors.length})</strong><button type="button" class="error-box-close" aria-label="Fermer les erreurs" title="Fermer">×</button></div><ul style="margin:6px 0 0 18px;padding-right:6px;">${errors.map(error => `<li>${escapeHtml(error.feed)} : ${escapeHtml(error.error)} <button class="mini-btn error-open-btn" type="button" data-url="${escapeHtml(error.feed)}">Ouvrir</button></li>`).join("")}</ul>`;
+          errorsEl.querySelector(".error-box-close")?.addEventListener("click", () => {
+            errorsEl.classList.add("hidden");
+          });
           errorsEl.querySelectorAll(".error-open-btn").forEach(button => {
             button.addEventListener("click", () => openArticle(button.dataset.url));
           });
@@ -680,7 +701,19 @@
           errorsEl.innerHTML = "";
         }
 
-        currentItems = payload.items || [];
+        currentItems = [...(payload.items || [])].filter(item =>
+          String(item.title || "").trim().toLowerCase() !== "feed currently unavailable - open source url"
+        ).sort((left, right) => {
+          const leftRaw = String(left.published_at || "").trim();
+          const rightRaw = String(right.published_at || "").trim();
+          const leftTime = leftRaw ? Date.parse(leftRaw) : NaN;
+          const rightTime = rightRaw ? Date.parse(rightRaw) : NaN;
+          const leftRank = Number.isFinite(leftTime) ? 1 : 0;
+          const rightRank = Number.isFinite(rightTime) ? 1 : 0;
+          if (leftRank !== rightRank) return rightRank - leftRank;
+          if (leftRank === 0) return 0;
+          return rightTime - leftTime;
+        });
         if (!currentItems.length) {
           feedListEl.innerHTML = '<div class="detail-empty"><strong>Aucun article disponible.</strong><br><br>Cliquez sur « Actualiser les sources » pour lancer une collecte, ou vérifiez les erreurs des feeds ci-dessus.</div>';
           articleDetailEl.innerHTML = '<div class="detail-empty">Sélectionnez un article pour lire son contenu.</div>';
@@ -705,21 +738,32 @@
         const list = document.getElementById("configSourceList");
         if (!list) return;
         list.innerHTML = sources.map((source, index) => `
-          <button class="config-source ${index === 0 ? "active" : ""}" type="button" data-source-id="${source.id}">
-            <span><strong>${escapeHtml(source.name)}</strong><small class="muted">${escapeHtml(source.category)}</small></span>
-            <span class="status">${source.enabled ? "Actif" : "Inactif"}</span>
-          </button>
+          <div class="config-source ${index === 0 ? "active" : ""}" data-source-id="${source.id}">
+            <label style="display:flex;align-items:flex-start;gap:8px;flex:1;cursor:pointer;">
+              <input type="checkbox" class="config-source-enabled" data-source-id="${source.id}" ${source.enabled ? "checked" : ""} />
+              <span><strong>${escapeHtml(source.name)}</strong><small class="muted">${escapeHtml(source.category)}</small><small>Dernier fetch : ${escapeHtml(source.last_fetch_at || "Jamais fetché")}</small></span>
+            </label>
+            <button class="mini-btn config-source-select" type="button" data-source-id="${source.id}">Éditer</button>
+          </div>
         `).join("");
 
-        list.querySelectorAll(".config-source").forEach(button => {
+        list.querySelectorAll(".config-source-select").forEach(button => {
           button.addEventListener("click", () => {
             list.querySelectorAll(".config-source").forEach(item => item.classList.remove("active"));
-            button.classList.add("active");
+            const row = button.closest(".config-source");
+            row?.classList.add("active");
             const source = sources.find(item => String(item.id) === button.dataset.sourceId);
             if (!source) return;
             document.getElementById("sourceName").value = source.name || "";
             document.getElementById("sourceUrl").value = source.url || "";
             document.getElementById("sourceCategory").value = source.category || "Presse";
+          });
+        });
+
+        list.querySelectorAll(".config-source-enabled").forEach(input => {
+          input.addEventListener("change", () => {
+            const source = sources.find(item => String(item.id) === input.dataset.sourceId);
+            if (source) source.enabled = input.checked;
           });
         });
 
@@ -777,119 +821,20 @@
       const savedFeedWidth = localStorage.getItem("atlas-feed-width");
       if (savedFeedWidth) document.documentElement.style.setProperty("--feed-width", savedFeedWidth);
 
-      // Login screen handling
-      const loginScreenEl = document.getElementById("loginScreen");
-      const apiBaseLoginEl = document.getElementById("apiBaseLogin");
-      const usernameLoginEl = document.getElementById("usernameLogin");
-      const passwordLoginEl = document.getElementById("passwordLogin");
-      const loginBtnFull = document.getElementById("loginBtnFull");
-      const loginErrorEl = document.getElementById("loginError");
-
-      function showLoginScreen() {
-        loginScreenEl.classList.remove("hidden");
-        apiBaseLoginEl.value = getApiBase();
-        usernameLoginEl.value = localStorage.getItem("atlas-username") || "demo";
-        passwordLoginEl.value = "demo";
-        setTimeout(() => {
-          apiBaseLoginEl.focus();
-        }, 100);
-      }
-
-      async function loginFull() {
-        const base = (apiBaseLoginEl.value.trim() || getApiBase()).replace(/\/$/, "");
-        const payload = {
-          username: usernameLoginEl.value.trim(),
-          password: passwordLoginEl.value
-        };
-
-        loginBtnFull.disabled = true;
-        loginBtnFull.textContent = "Connexion...";
-        loginErrorEl.textContent = "";
-
+      document.getElementById("loginForm")?.addEventListener("submit", async event => {
+        event.preventDefault();
+        const button = document.getElementById("loginBtn");
+        const errorEl = document.getElementById("loginError");
+        button.disabled = true;
+        button.textContent = "Connexion...";
+        errorEl.textContent = "";
         try {
-          const res = await fetch(`${base}/auth/login`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload)
-          });
-
-          if (!res.ok) {
-            const txt = await res.text();
-            throw new Error(`Login failed: ${txt}`);
-          }
-
-          const data = await res.json();
-          token = data.token;
-          localStorage.setItem("atlas-token", token);
-          localStorage.setItem("atlas-api-base", base);
-          localStorage.setItem("atlas-username", payload.username);
-
-          window.location.reload();
+          await login();
         } catch (error) {
-          loginErrorEl.textContent = error.message;
+          errorEl.textContent = error instanceof Error ? error.message : "Erreur de connexion";
         } finally {
-          loginBtnFull.disabled = false;
-          loginBtnFull.textContent = "Login";
-        }
-      }
-
-      document.getElementById("loginCard")?.addEventListener("click", () => {
-        document.getElementById("loginCard").classList.add("hidden");
-        showLoginScreen();
-      });
-
-      loginBtnFull.addEventListener("click", loginFull);
-
-      // Auto-login if token is available
-      (async () => {
-        token = localStorage.getItem("atlas-token");
-        if (token) {
-          try {
-            const base = getApiBase();
-            const res = await fetch(`${base}/auth/me`, { headers: authHeaders() });
-            if (res.ok) {
-              const data = await res.json();
-              whoamiEl.innerHTML = `Connected as <span class="status">${escapeHtml(data.username)}</span> role <span class="status">${escapeHtml(data.role)}</span>`;
-              document.getElementById("loginCard").classList.add("hidden");
-              appEl.classList.remove("hidden");
-              await loadSources();
-              renderConfigSources();
-              await refreshLatest();
-              await refreshBriefing();
-            } else {
-              showLoginScreen();
-            }
-          } catch {
-            showLoginScreen();
-          }
-        } else {
-          showLoginScreen();
-        }
-      })();
-
-      selectAllBtn?.addEventListener("click", () => {
-        rssListEl.querySelectorAll("input[type=checkbox]").forEach(input => { input.checked = true; });
-      });
-
-      selectNoneBtn?.addEventListener("click", () => {
-        rssListEl.querySelectorAll("input[type=checkbox]").forEach(input => { input.checked = false; });
-      });
-
-      saveSourcesBtn?.addEventListener("click", async () => {
-        saveSourcesBtn.disabled = true;
-        const previousText = saveSourcesBtn.textContent;
-        saveSourcesBtn.textContent = "Enregistrement...";
-        try {
-          await saveSources();
-          saveSourcesBtn.textContent = "Enregistré";
-        } catch (error) {
-          saveSourcesBtn.textContent = "Erreur";
-          metaEl.textContent = error instanceof Error ? error.message : "Erreur d’enregistrement";
-        } finally {
-          setTimeout(() => {
-            saveSourcesBtn.disabled = false;
-            saveSourcesBtn.textContent = previousText;
-          }, 900);
+          button.disabled = false;
+          button.textContent = "Sign in";
         }
       });
 
@@ -923,6 +868,56 @@
           setTimeout(() => {
             refreshBtn.disabled = false;
             refreshBtn.textContent = "Recharger le dernier run";
+          }, 900);
+        }
+      });
+
+      document.getElementById("selectAllSourcesBtn")?.addEventListener("click", () => {
+        document.querySelectorAll(".config-source-enabled").forEach(input => {
+          input.checked = true;
+          const source = sources.find(item => String(item.id) === input.dataset.sourceId);
+          if (source) source.enabled = true;
+        });
+      });
+
+      document.getElementById("selectNoneSourcesBtn")?.addEventListener("click", () => {
+        document.querySelectorAll(".config-source-enabled").forEach(input => {
+          input.checked = false;
+          const source = sources.find(item => String(item.id) === input.dataset.sourceId);
+          if (source) source.enabled = false;
+        });
+      });
+
+      document.getElementById("invertSourcesBtn")?.addEventListener("click", () => {
+        document.querySelectorAll(".config-source-enabled").forEach(input => {
+          input.checked = !input.checked;
+          const source = sources.find(item => String(item.id) === input.dataset.sourceId);
+          if (source) source.enabled = input.checked;
+        });
+      });
+
+      document.getElementById("saveSourceBtn")?.addEventListener("click", async () => {
+        const button = document.getElementById("saveSourceBtn");
+        const sourceIds = [...document.querySelectorAll(".config-source-enabled:checked")]
+          .map(input => Number(input.dataset.sourceId));
+        button.disabled = true;
+        button.textContent = "Enregistrement...";
+        try {
+          const base = getApiBase();
+          const res = await fetch(`${base}/users/me/rss-sources`, {
+            method: "PUT",
+            headers: authHeaders(),
+            body: JSON.stringify({ source_ids: sourceIds }),
+          });
+          if (!res.ok) throw new Error(await res.text());
+          await loadSources();
+          button.textContent = "Enregistré";
+        } catch (error) {
+          button.textContent = "Erreur";
+        } finally {
+          setTimeout(() => {
+            button.disabled = false;
+            button.textContent = "Enregistrer";
           }, 900);
         }
       });

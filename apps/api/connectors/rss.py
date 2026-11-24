@@ -5,7 +5,7 @@ import json
 import os
 import re
 import ssl
-from datetime import timezone
+from datetime import datetime, timezone
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from urllib.error import HTTPError, URLError
@@ -84,16 +84,6 @@ class RSSConnector(BaseConnector):
                 all_items.extend(items)
             elif err:
                 errors.append({"feed": feed_url, "error": err})
-                if include_fallback_feed_items:
-                    all_items.append(
-                        {
-                            "source": source_name,
-                            "source_url": feed_url,
-                            "title": "Feed currently unavailable - open source URL",
-                            "url": feed_url,
-                            "published_at": "",
-                        }
-                    )
 
         # Deduplicate by URL first, then by title+source when URL is absent.
         seen: set[str] = set()
@@ -105,7 +95,19 @@ class RSSConnector(BaseConnector):
             seen.add(key)
             unique_items.append(item)
 
-        unique_items.sort(key=lambda x: (x.get("published_at", ""), x.get("title", "")), reverse=True)
+        def published_sort_key(item: dict[str, str]) -> tuple[int, datetime, str]:
+            raw = str(item.get("published_at") or "").strip()
+            if not raw:
+                return (0, datetime.min.replace(tzinfo=timezone.utc), "")
+            try:
+                parsed = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                if parsed.tzinfo is None:
+                    parsed = parsed.replace(tzinfo=timezone.utc)
+                return (1, parsed.astimezone(timezone.utc), item.get("title") or "")
+            except (TypeError, ValueError):
+                return (0, datetime.min.replace(tzinfo=timezone.utc), item.get("title") or "")
+
+        unique_items.sort(key=published_sort_key, reverse=True)
         mode = "live-rss" if run_mode != "dryrun" else "dryrun-live-rss"
         return ConnectorRunResult(mode=mode, items=unique_items, errors=errors)
 
@@ -120,6 +122,7 @@ class RSSConnector(BaseConnector):
     ) -> tuple[list[dict[str, str]], str | None]:
         candidates = self._candidate_urls(feed_url)
         attempted: list[str] = []
+        attempt_errors: list[str] = []
         discovery_attempted = False
 
         for candidate in candidates:
@@ -131,6 +134,7 @@ class RSSConnector(BaseConnector):
                 allow_insecure_ssl=allow_insecure_ssl,
             )
             if fetch_err:
+                attempt_errors.append(f"{candidate}: {fetch_err}")
                 # For 404/403, try discovery from the website homepage once.
                 if ("HTTP Error 404" in fetch_err or "HTTP Error 403" in fetch_err) and not discovery_attempted:
                     discovered = self._discover_feed_candidates(candidate, user_agent, timeout, allow_insecure_ssl)
@@ -144,11 +148,26 @@ class RSSConnector(BaseConnector):
             if items:
                 return items, None
 
+            preview = payload[:300].lstrip().lower()
+            if preview.startswith(b"<!doctype html") or preview.startswith(b"<html"):
+                attempt_errors.append(f"{candidate}: HTTP response is HTML, not RSS/Atom")
+            else:
+                attempt_errors.append(f"{candidate}: response contained no readable RSS/Atom entries")
+
+            if not discovery_attempted:
+                discovered = self._discover_feed_candidates(candidate, user_agent, timeout, allow_insecure_ssl)
+                discovery_attempted = True
+                for extra in discovered:
+                    if extra not in candidates:
+                        candidates.append(extra)
+
         final_err = "No readable feed found"
         if attempted:
             final_err = f"{final_err} after trying {len(attempted)} URL(s): {', '.join(attempted[:4])}"
             if len(attempted) > 4:
                 final_err += ", ..."
+        if attempt_errors:
+            final_err = f"{final_err}. Details: {' | '.join(attempt_errors[:6])}"
         return [], final_err
 
     def _fetch_payload(
@@ -336,13 +355,25 @@ class RSSConnector(BaseConnector):
         return None
 
     def _safe_dt(self, value: str) -> str:
+        value = str(value or "").strip()
         if not value:
             return ""
         try:
             dt = parsedate_to_datetime(value)
+            if dt is not None:
+                if dt.tzinfo is None:
+                    dt = dt.replace(tzinfo=timezone.utc)
+                return dt.astimezone(timezone.utc).isoformat()
+        except (TypeError, ValueError, OverflowError):
+            pass
+
+        try:
+            dt = datetime.fromisoformat(value.replace("Z", "+00:00"))
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
             return dt.astimezone(timezone.utc).isoformat()
-        except Exception:
-            return value
+        except (TypeError, ValueError, OverflowError):
+            return ""
 
     def _parse_rss_or_atom(
         self,
