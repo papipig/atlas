@@ -77,6 +77,7 @@ def _parse_rss_sources_from_old_file() -> list[dict[str, str]]:
                 "name": name,
                 "url": url,
                 "status": status,
+                "active": "true",
             }
         )
 
@@ -143,15 +144,22 @@ def _seed_demo_user_and_sources() -> None:
                 cur.execute(
                     """
                     INSERT INTO rss_sources (category, name, url, status, active)
-                    VALUES (%s, %s, %s, %s, TRUE)
+                    VALUES (%s, %s, %s, %s, %s)
                     ON CONFLICT (url)
                     DO UPDATE SET
                       category = EXCLUDED.category,
                       name = EXCLUDED.name,
                       status = EXCLUDED.status,
+                      active = EXCLUDED.active,
                       updated_at = NOW()
                     """,
-                    (src["category"], src["name"], src["url"], src["status"]),
+                    (
+                        src["category"],
+                        src["name"],
+                        src["url"],
+                        src["status"],
+                        src["active"] == "true",
+                    ),
                 )
 
             cur.execute("SELECT id FROM user_accounts")
@@ -163,10 +171,27 @@ def _seed_demo_user_and_sources() -> None:
                     INSERT INTO user_rss_source_prefs (user_id, source_id, enabled)
                     SELECT %s, s.id, TRUE
                     FROM rss_sources s
+                    WHERE s.active = TRUE
                     ON CONFLICT (user_id, source_id) DO NOTHING
                     """,
                     (user_id,),
                 )
+
+            cur.execute(
+                """
+                DELETE FROM user_rss_source_prefs
+                WHERE source_id IN (
+                    SELECT id FROM rss_sources
+                    WHERE active = FALSE OR status = 'unavailable'
+                )
+                """
+            )
+            cur.execute(
+                """
+                DELETE FROM rss_sources
+                WHERE active = FALSE OR status = 'unavailable'
+                """
+            )
 
         conn.commit()
 
@@ -226,6 +251,7 @@ def list_user_rss_sources(user_id: int) -> list[dict[str, Any]]:
                 FROM rss_sources s
                 LEFT JOIN user_rss_source_prefs p
                   ON p.source_id = s.id AND p.user_id = %s
+                WHERE s.active = TRUE
                 ORDER BY s.category, s.name
                 """,
                 (user_id,),
@@ -246,7 +272,9 @@ def set_user_rss_sources(user_id: int, source_ids: list[int]) -> None:
                 cur.executemany(
                     """
                     INSERT INTO user_rss_source_prefs (user_id, source_id, enabled, updated_at)
-                    VALUES (%s, %s, TRUE, NOW())
+                    SELECT %s, s.id, TRUE, NOW()
+                    FROM rss_sources s
+                    WHERE s.id = %s AND s.active = TRUE
                     ON CONFLICT (user_id, source_id)
                     DO UPDATE SET enabled = EXCLUDED.enabled, updated_at = NOW()
                     """,
